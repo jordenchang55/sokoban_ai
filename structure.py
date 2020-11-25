@@ -1,9 +1,36 @@
+from __future__ import annotations
+
+
+class Action:
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+    UP = (0, -1)
+    DOWN = (0, 1)
+
+    def __init__(self, direction, steps: int):
+        self.steps = steps
+        self.direction = direction
+
+
+class State:
+    """
+    This class maintain the state that may be updated during the game.
+    """
+
+    def __init__(self, boxes: [int], player_position: int):
+        self.boxes = boxes
+        self.player_position = player_position
+
+    def __eq__(self, other):
+        return self.player_position == other.player_position and set(self.boxes) == set(other.boxes)
+
+
 class Environment:
     """
     This class keeps all map information, such as width, positions of goals, from input file.
     """
 
-    def __init__(self, input_text):
+    def __init__(self, input_text: str):
         self.storages = []
         self.walls = []
         self.width = 0
@@ -72,12 +99,47 @@ class Environment:
         else:
             plt.show()
 
+    def is_goal(self, node: Node) -> bool:
+        """
+        Determine if all boxes are put onto storages.
+        """
+        return set(self.storages) == set(node.state.boxes)
 
-class State:
+    def get_actions(self, state: State) -> [Action]:
+        """
+        Gets available actions from given state.
+        """
+        # TODO: implement this
+        pass
+
+    def move(self, state, action) -> State:
+        # TODO: implement this
+        pass
+
+    def calc_action_cost(self, state: State, action: Action, next_state: State) -> int:
+        # TODO: implement this
+        pass
+
+
+class Node:
     """
-    This class maintain the state that may be updated during the game.
+    This class represents the node in search tree and it contains the state and
     """
 
-    def __init__(self, boxes, player_position):
-        self.boxes = boxes
-        self.player_position = player_position
+    def __init__(self, state: State, action: Action = None, parent: Node = None, path_cost: int = 0):
+        self.state = state
+        self.action = action
+        self.parent = parent
+        self.path_cost = path_cost
+
+    def __cmp__(self, other):
+        """
+        This is comparing function for priority queue to decide which node will go first.
+        :param other: another node compares to this one.
+        """
+        return Node.get_value(self) - Node.get_value(other)
+
+    @staticmethod
+    def get_value(node: Node):
+        # This needs to be override
+        raise NotImplementedError
