@@ -45,7 +45,7 @@ class SimpleActor(Actor):
 
 	def get_action(self, state, sokoban_map, storage):
 
-		
+
 		pass	
 
 
@@ -62,8 +62,9 @@ class QLearning(Actor):
 		self.discount_factor = kwargs['discount_factor']
 
 	def next_state(self, state, action):
-
+		pass
 	def reward(self, state, action):
+		pass
 
 	def update(self, state, action):
 

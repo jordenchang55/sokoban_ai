@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from enum import Enum
-
+from collections import namedtuple
 State = namedtuple('State', ['player', 'boxes'])
 
 class MapType(Enum):
@@ -34,6 +34,8 @@ class Environment():
 		for box in boxes:
 			self.map[box] = MapType.BOX.value
 		self.map[tuple(player)] = MapType.PLAYER.value
+		self.player = player
+		self.boxes = boxes
 
 	def goal(self):
 		for place in self.storage:
@@ -45,7 +47,7 @@ class Environment():
 	def step(self):
 
 
-		action = self.actor.get_action(self.player, self.map)
+		action = self.actor.get_action(State(self.player, self.boxes), self.map, self.storage)
 		#print(move)
 		#print(move)
 		next_position = action + self.player
@@ -62,7 +64,7 @@ class Environment():
 				self.player = next_position
 
 
-				self.boxes == 
+				#self.boxes == 
 
 				return next_position
 			else:
