@@ -48,7 +48,7 @@ class QActor(Actor):
 
 	def __init__(self, storage, *args, **kwargs):
 		#super()
-		super().__init__(storage, args, kwargs)
+		super().__init__(set(storage), args, kwargs)
 		self.qmap = {}
 
 		self.learning_rate = kwargs['learning_rate']
@@ -62,16 +62,24 @@ class QActor(Actor):
 		box_pushing = sokoban_map[tuple(state.player + action)] == MapType.BOX.value and sokoban_map[tuple(state.player + 2*action)] == MapType.EMPTY.value
 		push_on_goal = box_pushing and (tuple(state.player+2*action) in self.storage)
 
-		goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.storage])
-		
+		# goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.storage])
+		if push_on_goal:
+			goal_reach = True
+			set_difference = self.storage.difference(set(tuple(state.player+2*action)))
+			for place in set_difference:
+				if sokoban_map[place] != MapType.BOX.value:
+					goal_reach = False
+		else:
+			goal_reach = False
 
 		if goal_reach:
-			return 100.
+			print("reward for finishing puzzle")
+			return 500.
 		elif push_on_goal:
-			return 10.
+			return 20.
 		elif box_pushing:
 			#print("rewarding for pushing boxes")
-			return 0.
+			return 0
 		else:
 			return -1.
 
