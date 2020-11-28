@@ -6,109 +6,19 @@ from pathlib import Path
 import numpy as np
 #from enum import Enum
 
-from actor import Actor
+import actor
+from actor import QActor
 from environment import Environment
 from environment import MapType
-# class MapType(Enum):
-# 	EMPTY = 0
-# 	PLAYER = 1
-# 	BOX = 2
-# 	WALL = 3
 
-# def goal(sokoban_map, storage):
-# 	for place in storage:
-# 		if sokoban_map[place] != MapType.BOX.value:
-# 			return False
-
-# 	return True
-
-# def draw(fig, xlim, ylim, sokoban_map, storage):
-	
-# 	ax = plt.gca()
-# 	ax.clear()
-# 	#create square boundary
-# 	lim = max(xlim, ylim)
-# 	plt.xlim(0, lim+1)
-# 	plt.ylim(0, lim+1)
-# 	ax.set_xticks(np.arange(0, lim+1))
-# 	ax.set_yticks(np.arange(0, lim+1))
-# 	plt.grid(alpha=0.2)
-
-
-# 	for i in range(sokoban_map.shape[0]):
-# 		for j in range(sokoban_map.shape[1]):
-# 			#print((i,j))
-# 			if sokoban_map[i,j] == MapType.WALL.value:
-# 				rect = patches.Rectangle((i+0.5, j+0.5),-1,-1,linewidth=0.5,edgecolor='slategray',facecolor='slategray')
-# 				ax.add_patch(rect)
-# 			elif sokoban_map[i,j] == MapType.BOX.value:
-# 				rect = patches.Rectangle((i+0.5, j+0.5), -1, -1, linewidth=0.5, edgecolor='tan', facecolor='tan')
-# 				ax.add_patch(rect)
-# 			elif sokoban_map[i,j] == MapType.PLAYER.value:
-# 				plt.plot(i, j, 'o', color='orange')
-
-# 	for place in storage:
-# 		circle = patches.Circle(place, 0.05, edgecolor='limegreen', facecolor='limegreen')
-# 		ax.add_patch(circle)
-
-
-
-	
-# 	#plt.draw()
-# 	#plt.show()
-# 	if args.save_figure:
-# 		plt.savefig('sokoban.png')
-# 	else:
-# 		plt.show(block=False)
-# 		# background = fig.canvas.copy_from_bbox(ax.bbox)
-# 		# fig.canvas.restore_region(background)
-# 		# fig.canvas.draw()
-
-# 		plt.pause(0.2)
-
-
-
-
-
-# def make_move(sokoban_ai, sokoban_map, player):
-
-
-# 	move = sokoban_ai.get_move(player, sokoban_map)
-# 	#print(move)
-# 	#print(move)
-# 	next_position = move + player
-# 	#print(next_position)
-# 	if sokoban_map[tuple(next_position)] == MapType.BOX.value:
-# 		#print("BOX")
-
-# 		box_next_position = next_position + move
-
-# 		if sokoban_map[tuple(box_next_position)] == MapType.EMPTY.value:
-# 			sokoban_map[tuple(player)] = MapType.EMPTY.value
-# 			sokoban_map[tuple(next_position)] = MapType.PLAYER.value
-# 			sokoban_map[tuple(box_next_position)] = MapType.BOX.value
-# 			player = next_position
-
-# 			return next_position
-# 		else:
-# 			#impossible to move box
-# 			return player
-
-# 	elif sokoban_map[tuple(next_position)] == MapType.WALL.value:
-# 		#print(tuple(next_position))
-# 		#print("WALL")
-# 		return player
-# 	elif sokoban_map[tuple(next_position)] == MapType.EMPTY.value:
-# 		#print("EMPTY")
-# 		sokoban_map[tuple(player)] = MapType.EMPTY.value
-# 		sokoban_map[tuple(next_position)] = MapType.PLAYER.value
-# 		player = next_position
-# 		return next_position
-# 	return player
+# def debug_print(fmt_string):
+# 	print(fmt_string)
+# control variables
+iteration_max = 1000 #deadlock by iteration 
 
 def main():
 
-	#fig = plt.figure()
+	max_episodes = abs(args.episodes)
 
 	filepath = Path(args.filename)
 	#print(args.filename)
@@ -135,36 +45,87 @@ def main():
 
 				xlim = int(row[0])
 				ylim = int(row[1])
-				sokoban_map = np.zeros((xlim+1, ylim+1))
 			if index == 1:
 				#print(MapType.WALL.value)
 				walls = unpack(row)
 			elif index == 2:	
 				boxes = unpack(row)
-				for box in boxes:
-					sokoban_map[box] = MapType.BOX.value
 			elif index == 3:
 				storage = unpack(row)
 			elif index == 4:
 				player = np.array([int(row[0]), int(row[1])])
-				sokoban_map[(int(row[0]), int(row[1]))] = MapType.PLAYER.value
 
-	environment = Environment(actor = Actor(), walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+	environment = Environment(actor = QActor(storage = storage, learning_rate = 1., discount_factor=0.9), walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
 
+	episode_bookmarks = []
+	episode_iterations = []
+
+	num_episodes = 0
 	num_iterations = 0
-	while not environment.goal():
-		environment.step()
-		environment.draw()
-		num_iterations += 1
+	goals_reached = 0
+	while num_episodes < max_episodes:
+		num_iterations = 0
+		while not (environment.goal() or environment.check_deadlock()):
+			environment.step()
+			if args.draw:
+				environment.draw()
+			num_iterations += 1
 
-	print("Goal reached.")
-	print(f"iterations:{num_iterations:3d}")
+			if num_iterations > iteration_max:
+				environment.draw()
+				break
+
+
+
+
+		if environment.goal():
+			goals_reached += 1
+			episode_bookmarks.append(num_episodes)
+			episode_iterations.append(num_iterations)
+
+			print(f"{num_episodes:4d}:goal reached")
+		else:
+			if num_episodes%100 == 0:
+				print(f"{num_episodes:4d}:deadlock reached")
+
+
+
+		environment.reset()
+		num_episodes += 1
+
+
+
+		if num_episodes > 0 and num_episodes % 500 == 0:
+			#evaluate!
+			previous = []
+			if len(previous) > 3:
+				previous.pop()
+			while not (environment.goal() or environment.check_deadlock()):
+				move = environment.step(evaluate=True)
+				environment.draw()
+				if num_iterations > 200 or any([(move == prev).all() for prev in previous]):
+					break
+				previous.append(move)
+			print("Evaluation results:")
+			if environment.goal():
+				print("Goal reached.")
+			print(f"num_iterations:{num_iterations}")
+	episode_iterations = np.array(episode_iterations)
+
+
+	print("-"*30)
+	print("Simulation ended.")
+	print(f"episodes           :{num_episodes}")
+	print(f"goals              :{goals_reached}")
+	print(f"average iterations :{np.mean(episode_iterations):3f}")
 
 	plt.show(block=True)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="Solve a Sokoban game using artificial intelligence.")
 	parser.add_argument('filename')
+	parser.add_argument('--episodes', '-e', action='store', type=int, default=5000)
 	parser.add_argument('--save_figure', '-s', action='store_true')
+	parser.add_argument('--draw', '-d', action='store_true')
 	args = parser.parse_args()
 	main()

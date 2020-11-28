@@ -1,35 +1,27 @@
 from enum import Enum
 import random
 import numpy as np
+
+import environment
 from environment import MapType
-
-from collections import namedtuple
-
+from environment import State
+#from collections import namedtuple
 
 
 class Actor():
-	UP = np.array([0,1])
-	DOWN = np.array([0, -1])
-	LEFT = np.array([-1, 0])
-	RIGHT = np.array([1, 0])
+	actions = [environment.UP, environment.RIGHT, environment.DOWN, environment.LEFT]
 
-	def __init__(self, *args, **kwargs):
-		#0, 1, 2, 3
-		self.actions = [self.UP, self.RIGHT, self.DOWN, self.LEFT]
+	def __init__(self, storage, *args, **kwargs):
+		self.storage = storage
 
 
-		#print(self.directions)
-
-	def get_neighbors(self, player, boxes, sokoban_map):
-		pass
-
-
-	def get_action(self, state, sokoban_map, storage):
+	def learn(self, state, sokoban_map):
 
 		return random.choice(self.actions)
 
 
-
+	def evaluate(self, state, sokoban_map):
+		return random.choice(self.actions)
 
 
 
@@ -39,11 +31,11 @@ class SimpleActor(Actor):
 	def __init__(self, *args, **kwargs):
 		pass
 
-	def heuristic(self, state, sokoban_map, storage):
+	def heuristic(self, state, sokoban_map):
 		pass
 
 
-	def get_action(self, state, sokoban_map, storage):
+	def get_action(self, state, sokoban_map):
 
 
 		pass	
@@ -51,33 +43,106 @@ class SimpleActor(Actor):
 
 
 
-class QLearning(Actor):
+class QActor(Actor):
 
 
-	def __init__(self, *args, **kwargs):
-
-		self.statemap = {}
+	def __init__(self, storage, *args, **kwargs):
+		#super()
+		super().__init__(storage, args, kwargs)
+		self.qmap = {}
 
 		self.learning_rate = kwargs['learning_rate']
 		self.discount_factor = kwargs['discount_factor']
 
-	def next_state(self, state, action):
-		pass
-	def reward(self, state, action):
-		pass
-
-	def update(self, state, action):
-
-		if str(state) not in self.statemap:
-			self.statemap[str(state, action)] = 0
+	def encode(self, state, action):
+		return str((state,action))
 
 
-		qmax = np.amax(np.array([self.statemap[str((state, action))] for action in self.actions]))
-		self.statemap[str(state, action)] += self.learning_rate*(reward(state, action) + self.discount_factor*(qmax) - self.statemap[str(state, action)])
+	def reward(self, state, action, sokoban_map):
+		box_pushing = sokoban_map[tuple(state.player + action)] == MapType.BOX.value and sokoban_map[tuple(state.player + 2*action)] == MapType.EMPTY.value
+		push_on_goal = box_pushing and (tuple(state.player+2*action) in self.storage)
+
+		goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.storage])
+		
+
+		if goal_reach:
+			return 100.
+		elif push_on_goal:
+			return 10.
+		elif box_pushing:
+			#print("rewarding for pushing boxes")
+			return 0.
+		else:
+			return -1.
 
 
-	def get_action(self, state, sokoban_map, storage):
+	def next_state(self, state, action, sokoban_map):
+		map_location = sokoban_map[tuple(state.player + action)]
+		if map_location == MapType.WALL.value:
+			next_state = state
+		elif map_location == MapType.BOX.value and sokoban_map[tuple(state.player + 2*action)] != MapType.EMPTY.value:
+			next_state = state
+		elif map_location == MapType.BOX.value:
+			boxes = state.boxes[:]
+			for i in range(len(boxes)):
+				if (boxes[i] == state.player+action).all():
+					boxes[i] = state.player + 2*action 
+			next_state = State(player = state.player + action, boxes = boxes)
+		else:
+			next_state = State(player = state.player + action, boxes = state.boxes)
+
+		return next_state
+
+	def update(self, state, action, sokoban_map):
+		#print(self.encode(state, action))
+		if self.encode(state, action) not in self.qmap:
+			self.qmap[self.encode(state, action)] = 0.
+
+		next_state = self.next_state(state, action, sokoban_map)
+
+		for possible_actions in self.actions:
+			if self.encode(next_state, possible_actions) not in self.qmap:
+				self.qmap[self.encode(next_state, possible_actions)] = 0.
+
+		qmax = np.amax(np.array([self.qmap[self.encode(next_state, possible_actions)] for possible_actions in self.actions]))
+		self.qmap[self.encode(state, action)] += self.learning_rate*(self.reward(state, action, sokoban_map) + self.discount_factor*qmax - self.qmap[self.encode(state, action)])
+
+		#print(f"{self.encode(state, action)}:{self.qmap[self.encode(state, action)]}")
 
 
-		action = random.choice(self.actions)
+	def learn(self, state, sokoban_map):
+		#exploration
+		if random.random() < 0.95:
+			chosen_action = random.choice(self.actions)
+		else:
+			chosen_action = self.evaluate(state, sokoban_map)
+		self.update(state, chosen_action, sokoban_map)
+		return chosen_action
+		
+	def evaluate(self, state, sokoban_map):
+		chosen_action = None
+		chosen_value = 0.
+		for possible_action in self.actions:
+
+			
+			if self.encode(state, possible_action) not in self.qmap:
+				self.qmap[self.encode(state, possible_action)] = 0. #represents an unseen state... not ideal while evaluating
+
+			#print(possible_action)
+			#print(self.qmap[self.encode(state, possible_action)])
+
+			if chosen_action is None:
+				chosen_action = possible_action
+				chosen_value = self.qmap[self.encode(state, possible_action)]
+			else:
+				potential_value = self.qmap[self.encode(state, possible_action)]
+				if chosen_value < potential_value:
+					#keep this one
+					chosen_action = possible_action
+					chosen_value = potential_value
+
+		#print(f"chosen action:{chosen_action}")
+		return chosen_action
+
+
 

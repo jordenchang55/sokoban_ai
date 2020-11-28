@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from enum import Enum
 from collections import namedtuple
+import copy
+#from actor import State
+
+
 State = namedtuple('State', ['player', 'boxes'])
 
 class MapType(Enum):
@@ -12,10 +16,16 @@ class MapType(Enum):
 	WALL = 3
 
 
+UP = np.array([0,1])
+DOWN = np.array([0, -1])
+LEFT = np.array([-1, 0])
+RIGHT = np.array([1, 0])
+DIRECTIONS = [UP, RIGHT, DOWN, LEFT]
+
 class Environment():
 
 
-	def __init__(self, actor, walls, boxes, player, storage, xlim, ylim, save_figure=False):
+	def __init__(self, actor, walls, boxes, player, storage, xlim, ylim):
 		self.actor = actor
 
 		self.fig = plt.figure()
@@ -25,9 +35,8 @@ class Environment():
 
 		self.state = State(player=player, boxes = np.array(boxes))
 
-		self.storage = storage
+		self.storage = set(storage)
 
-		self.save_figure = save_figure
 
 		for wall in walls:
 			self.map[wall] = MapType.WALL.value
@@ -37,6 +46,21 @@ class Environment():
 		self.player = player
 		self.boxes = boxes
 
+		self.original_map = copy.deepcopy(self.map)
+		self.original_player = copy.deepcopy(self.player)
+		self.original_boxes = copy.deepcopy(self.boxes)
+
+
+
+
+	def reset(self):
+		# print("reset!")
+		# print(f"player:{self.player}")
+		# print(f"reset_player:{self.original_player}")
+		self.map = copy.deepcopy(self.original_map)
+		self.player = copy.deepcopy(self.original_player)
+		self.boxes = copy.deepcopy(self.original_boxes)
+
 	def goal(self):
 		for place in self.storage:
 			if self.map[place] != MapType.BOX.value:
@@ -44,10 +68,76 @@ class Environment():
 
 		return True
 
-	def step(self):
 
 
-		action = self.actor.get_action(State(self.player, self.boxes), self.map, self.storage)
+
+	def get_neighbors(self, location):
+		return [location + direction for direction in DIRECTIONS]
+
+
+	def is_frozen(self, location, previous=set([])):
+		neighbors = self.get_neighbors(location)
+		previous.add(tuple(location))
+		if tuple(location) not in self.storage:
+			for i in range(len(neighbors)):
+				neighbor = tuple(neighbors[i])
+				next_neighbor = tuple(neighbors[(i+1)%len(neighbors)])
+
+				if self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.WALL.value:
+					return True
+				elif self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.BOX.value:
+					if next_neighbor in previous:
+						#dependency cycle!
+						return True
+
+					if self.is_frozen(np.array(next_neighbor), previous):
+						return True
+				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.WALL.value:
+					if neighbor in previous:
+						#dependency cycle!
+						return True
+
+					if self.is_frozen(np.array(neighbor), previous):
+						return True
+				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.BOX.value:
+					if neighbor not in previous:
+						frozen_neighbor = is_frozen(np.array(neighbor), previous)
+					else:
+						frozen_neighbor = True
+					if next_neighbor not in previous:
+						frozen_next_neighbor = is_frozen(np.array(neighbor), previous)
+					else:
+						frozen_next_neighbor = True
+
+					if frozen_neighbor and frozen_next_neighbor:
+						return True
+
+
+	def check_deadlock(self):
+		for box in self.boxes:
+			if self.is_frozen(box):
+				return True
+
+
+			# if tuple(box) not in self.storage:
+			# 	for i in range(len(neighbors)):
+			# 		#print(neighbor)
+			# 		if self.map[tuple(neighbors[i])] == MapType.WALL.value and \
+			# 			self.map[tuple(neighbors[(i+1)%len(neighbors)])] == MapType.WALL.value:
+			# 			return True
+					#do not include boxes for now
+
+
+		return False
+
+
+	def step(self, evaluate=False):
+
+
+		if not evaluate:
+			action = self.actor.learn(State(self.player, self.boxes), self.map)
+		else:
+			action = self.actor.evaluate(State(self.player, self.boxes), self.map)
 		#print(move)
 		#print(move)
 		next_position = action + self.player
@@ -63,8 +153,9 @@ class Environment():
 				self.map[tuple(box_next_position)] = MapType.BOX.value
 				self.player = next_position
 
-
-				#self.boxes == 
+				for i in range(len(self.boxes)):
+					if (self.boxes[i] == next_position).all():
+						self.boxes[i] = box_next_position 
 
 				return next_position
 			else:
@@ -88,7 +179,7 @@ class Environment():
 
 
 
-	def draw(self):
+	def draw(self, save_figure = False):
 	
 		ax = plt.gca()
 		ax.clear()
@@ -122,7 +213,7 @@ class Environment():
 		
 		#plt.draw()
 		#plt.show()
-		if self.save_figure:
+		if save_figure:
 			plt.savefig('sokoban.png')
 		else:
 			plt.show(block=False)
@@ -130,4 +221,4 @@ class Environment():
 			# fig.canvas.restore_region(background)
 			# fig.canvas.draw()
 
-			plt.pause(0.2)
+			plt.pause(0.05)
