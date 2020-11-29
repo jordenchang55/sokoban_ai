@@ -98,14 +98,16 @@ def main():
 		if num_episodes > 0 and num_episodes % 500 == 0:
 			#evaluate!
 			previous = []
-			if len(previous) > 3:
-				previous.pop()
+			if len(previous) > 1:
+				previous.pop(0)
+			num_iterations = 0
 			while not (environment.goal() or environment.check_deadlock()):
 				move = environment.step(evaluate=True)
 				environment.draw()
-				if num_iterations > 200 or any([(move == prev).all() for prev in previous]):
+				num_iterations += 1
+				if num_iterations > 200:
 					break
-				previous.append(move)
+				
 			print("Evaluation results:")
 			if environment.goal():
 				print("Goal reached.")

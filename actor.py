@@ -73,13 +73,13 @@ class QActor(Actor):
 			goal_reach = False
 
 		if goal_reach:
-			print("reward for finishing puzzle")
+			#print("reward for finishing puzzle")
 			return 500.
 		elif push_on_goal:
-			return 20.
+			return 50.
 		elif box_pushing:
 			#print("rewarding for pushing boxes")
-			return 0
+			return -1.
 		else:
 			return -1.
 
@@ -120,7 +120,7 @@ class QActor(Actor):
 
 	def learn(self, state, sokoban_map):
 		#exploration
-		if random.random() < 0.95:
+		if random.random() < 1.:
 			chosen_action = random.choice(self.actions)
 		else:
 			chosen_action = self.evaluate(state, sokoban_map)
@@ -136,8 +136,8 @@ class QActor(Actor):
 			if self.encode(state, possible_action) not in self.qmap:
 				self.qmap[self.encode(state, possible_action)] = 0. #represents an unseen state... not ideal while evaluating
 
-			#print(possible_action)
-			#print(self.qmap[self.encode(state, possible_action)])
+			print(possible_action)
+			print(self.qmap[self.encode(state, possible_action)])
 
 			if chosen_action is None:
 				chosen_action = possible_action
@@ -149,7 +149,7 @@ class QActor(Actor):
 					chosen_action = possible_action
 					chosen_value = potential_value
 
-		#print(f"chosen action:{chosen_action}")
+		print(f"chosen action:{chosen_action}")
 		return chosen_action
 
 

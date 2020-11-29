@@ -221,4 +221,4 @@ class Environment():
 			# fig.canvas.restore_region(background)
 			# fig.canvas.draw()
 
-			plt.pause(1)
+			plt.pause(0.05)
