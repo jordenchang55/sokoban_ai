@@ -1,11 +1,14 @@
-from enum import Enum
 import random
+import random
+
 import numpy as np
 
 import environment
 from environment import MapType
 from environment import State
-#from collections import namedtuple
+
+
+# from collections import namedtuple
 
 
 class Actor():
@@ -76,12 +79,9 @@ class QActor(Actor):
 			print("reward for finishing puzzle")
 			return 500.
 		elif push_on_goal:
-			return 20.
-		elif box_pushing:
-			#print("rewarding for pushing boxes")
-			return 0
+			return 50.
 		else:
-			return -1.
+			return -1
 
 
 	def next_state(self, state, action, sokoban_map):
