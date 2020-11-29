@@ -65,7 +65,7 @@ class QActor(Actor):
 		# goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.storage])
 		if push_on_goal:
 			goal_reach = True
-			set_difference = self.storage.difference(set(tuple(state.player+2*action)))
+			set_difference = self.storage.difference({tuple(state.player + 2 * action)})
 			for place in set_difference:
 				if sokoban_map[place] != MapType.BOX.value:
 					goal_reach = False
