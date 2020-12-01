@@ -6,8 +6,8 @@ from pathlib import Path
 import numpy as np
 #from enum import Enum
 
-import actor
-from actor import QActor
+import agent
+from agent import QAgent
 from environment import Environment
 from environment import MapType
 
@@ -55,7 +55,8 @@ def main():
 			elif index == 4:
 				player = np.array([int(row[0]), int(row[1])])
 
-	environment = Environment(actor = QActor(storage = storage, learning_rate = 1., discount_factor=0.9), walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+	environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+	agent = QAgent(environment = environment, learning_rate = 1., discount_factor=0.9, replay_rate = 0.2)
 
 	episode_bookmarks = []
 	episode_iterations = []
@@ -64,62 +65,38 @@ def main():
 	num_iterations = 0
 	goals_reached = 0
 	while num_episodes < max_episodes:
-		num_iterations = 0
-		while not (environment.goal() or environment.check_deadlock()):
-			environment.step()
-			if args.draw:
-				environment.draw()
-			num_iterations += 1
+		goal, iterations = agent.episode(draw = args.draw)
 
-			if num_iterations > iteration_max:
-				environment.draw()
-				break
-
-
-
-
-		if environment.goal():
+		if goal:
 			goals_reached += 1
 			episode_bookmarks.append(num_episodes)
-			episode_iterations.append(num_iterations)
-
-			print(f"{num_episodes:4d}:goal reached")
-		else:
-			if num_episodes%100 == 0:
-				print(f"{num_episodes:4d}:deadlock reached")
+			episode_iterations.append(iterations)
+			print(f"{num_episodes:5d}:goal reached.")
+		if num_episodes % 100 == 0:
+			print(f"{num_episodes:5d}:")
 
 
+		if num_episodes > 0 and num_episodes % 100 == 0:
+			goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
+			print("-"*20)
+			print(f"evaluation:{goal}")
+			if goal:
+				print(f"iterations:{iterations}")
+			print("-"*20)
 
-		environment.reset()
+
 		num_episodes += 1
-
-
-
-		if num_episodes > 0 and num_episodes % 500 == 0:
-			#evaluate!
-			previous = []
-			if len(previous) > 1:
-				previous.pop(0)
-			num_iterations = 0
-			while not (environment.goal() or environment.check_deadlock()):
-				move = environment.step(evaluate=True)
-				environment.draw()
-				num_iterations += 1
-				if num_iterations > 200:
-					break
-				
-			print("Evaluation results:")
-			if environment.goal():
-				print("Goal reached.")
-			print(f"num_iterations:{num_iterations}")
 	episode_iterations = np.array(episode_iterations)
 
+	goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
 
 	print("-"*30)
 	print("Simulation ended.")
-	print(f"episodes           :{num_episodes}")
-	print(f"goals              :{goals_reached}")
-	print(f"average iterations :{np.mean(episode_iterations):3f}")
+	print(f"episodes   :{num_episodes}")
+	print(f"map solved :{goal}")
+	print(f"iterations :{iterations}")
+	
+
 
 	plt.show(block=True)
 

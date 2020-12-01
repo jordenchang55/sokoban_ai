@@ -7,7 +7,7 @@ import copy
 #from actor import State
 
 
-State = namedtuple('State', ['player', 'boxes'])
+
 
 class MapType(Enum):
 	EMPTY = 0
@@ -25,15 +25,12 @@ DIRECTIONS = [UP, RIGHT, DOWN, LEFT]
 class Environment():
 
 
-	def __init__(self, actor, walls, boxes, player, storage, xlim, ylim):
-		self.actor = actor
+	def __init__(self, walls, boxes, player, storage, xlim, ylim):
 
 		self.fig = plt.figure()
 		self.map = np.zeros((xlim+1, ylim+1))
 		self.xlim = xlim
 		self.ylim = ylim
-
-		self.state = State(player=player, boxes = np.array(boxes))
 
 		self.storage = set(storage)
 
@@ -61,7 +58,7 @@ class Environment():
 		self.player = copy.deepcopy(self.original_player)
 		self.boxes = copy.deepcopy(self.original_boxes)
 
-	def goal(self):
+	def is_goal(self):
 		for place in self.storage:
 			if self.map[place] != MapType.BOX.value:
 				return False
@@ -113,35 +110,14 @@ class Environment():
 						return True
 
 
-	def check_deadlock(self):
+	def is_deadlock(self):
 		for box in self.boxes:
 			if self.is_frozen(box):
 				return True
-
-
-			# if tuple(box) not in self.storage:
-			# 	for i in range(len(neighbors)):
-			# 		#print(neighbor)
-			# 		if self.map[tuple(neighbors[i])] == MapType.WALL.value and \
-			# 			self.map[tuple(neighbors[(i+1)%len(neighbors)])] == MapType.WALL.value:
-			# 			return True
-					#do not include boxes for now
-
-
 		return False
 
-
-	def step(self, evaluate=False):
-
-
-		if not evaluate:
-			action = self.actor.learn(State(self.player, self.boxes), self.map)
-		else:
-			action = self.actor.evaluate(State(self.player, self.boxes), self.map)
-		#print(move)
-		#print(move)
-		next_position = action + self.player
-		#print(next_position)
+	def step(self, action):
+		next_position = self.player + action
 		if self.map[tuple(next_position)] == MapType.BOX.value:
 			#print("BOX")
 
@@ -173,6 +149,19 @@ class Environment():
 			self.player = next_position
 			return next_position
 		return self.player
+
+	# def step(self, evaluate=False):
+
+
+	# 	if not evaluate:
+	# 		action = self.actor.learn(State(self.player, self.boxes), self.map)
+	# 	else:
+	# 		action = self.actor.evaluate(State(self.player, self.boxes), self.map)
+	# 	#print(move)
+	# 	#print(move)
+	# 	next_position = action + self.player
+	# 	#print(next_position)
+		
 
 
 
