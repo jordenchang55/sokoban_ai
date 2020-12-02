@@ -48,6 +48,9 @@ class Environment():
 		self.original_boxes = copy.deepcopy(self.boxes)
 
 
+		# self.frozen_nodes = None #used in deadlock checking
+
+
 
 
 	def reset(self):
@@ -77,45 +80,66 @@ class Environment():
 			previous = set([])
 		neighbors = self.get_neighbors(location)
 		previous.add(tuple(location))
+		# print(f"adding {tuple(location)}")
+		# print(previous)
+		# print(tuple(location) in previous)
+		# print('-'*len(previous))
 		if tuple(location) not in self.storage:
 			for i in range(len(neighbors)):
 				neighbor = tuple(neighbors[i])
 				next_neighbor = tuple(neighbors[(i+1)%len(neighbors)])
 
 				if self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.WALL.value:
+					#print("case 1")
 					return True
 				elif self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.BOX.value:
-					if tuple(next_neighbor) in previous:
+					#print("case 2")
+
+					if next_neighbor in previous:
 						#dependency cycle!
 						return True
-					print(previous)
+					#print(previous)
 					if self.is_frozen(np.array(next_neighbor), previous):
 						return True
 				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.WALL.value:
-					if tuple(neighbor) in previous:
+					#print("case 3")
+
+					if neighbor in previous:
 						#dependency cycle!
 						return True
 
 					if self.is_frozen(np.array(neighbor), previous):
 						return True
 				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.BOX.value:
-					if tuple(neighbor) not in previous:
-						frozen_neighbor = self.is_frozen(np.array(neighbor), previous)
-					else:
+					# print("case 4")
+					# print(neighbor in previous)
+					# print(next_neighbor in previous)
+					if neighbor in previous:
 						frozen_neighbor = True
-					if tuple(next_neighbor) not in previous:
-						frozen_next_neighbor = self.is_frozen(np.array(neighbor), previous)
 					else:
+						frozen_neighbor = self.is_frozen(np.array(neighbor), previous)
+					if next_neighbor in previous:
 						frozen_next_neighbor = True
+					else:
+						frozen_next_neighbor = self.is_frozen(np.array(next_neighbor), previous)
 
 					if frozen_neighbor and frozen_next_neighbor:
 						return True
 
+		previous.remove(tuple(location))
+		return False
+
 
 	def is_deadlock(self):
+		# if not self.frozen_nodes:
+		# 	self.frozen_nodes = set([])
 		for box in self.boxes:
 			if self.is_frozen(box):
+
+				#self.frozen_nodes = None
 				return True
+
+		#self.frozen_nodes = None
 		return False
 
 	def step(self, action):
