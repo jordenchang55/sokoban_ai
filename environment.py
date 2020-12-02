@@ -72,7 +72,9 @@ class Environment():
 		return [location + direction for direction in DIRECTIONS]
 
 
-	def is_frozen(self, location, previous=set([])):
+	def is_frozen(self, location, previous=None):
+		if not previous:
+			previous = set([])
 		neighbors = self.get_neighbors(location)
 		previous.add(tuple(location))
 		if tuple(location) not in self.storage:
@@ -98,11 +100,11 @@ class Environment():
 						return True
 				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.BOX.value:
 					if neighbor not in previous:
-						frozen_neighbor = is_frozen(np.array(neighbor), previous)
+						frozen_neighbor = self.is_frozen(np.array(neighbor), previous)
 					else:
 						frozen_neighbor = True
 					if next_neighbor not in previous:
-						frozen_next_neighbor = is_frozen(np.array(neighbor), previous)
+						frozen_next_neighbor = self.is_frozen(np.array(neighbor), previous)
 					else:
 						frozen_next_neighbor = True
 
