@@ -40,26 +40,27 @@ class Environment():
 		for box in boxes:
 			self.map[box] = MapType.BOX.value
 		self.map[tuple(player)] = MapType.PLAYER.value
-		self.player = player
-		self.boxes = boxes
+		# self.state[0] = player
+		# self.state[1:] = boxes
+		self.state = np.array([player, *boxes])
 
 		self.original_map = copy.deepcopy(self.map)
-		self.original_player = copy.deepcopy(self.player)
-		self.original_boxes = copy.deepcopy(self.boxes)
 
 
-		# self.frozen_nodes = None #used in deadlock checking
+		self.original_state = copy.deepcopy(self.state)
+
+
 
 
 
 
 	def reset(self):
 		# print("reset!")
-		# print(f"player:{self.player}")
+		# print(f"player:{self.state[0]}")
 		# print(f"reset_player:{self.original_player}")
 		self.map = copy.deepcopy(self.original_map)
-		self.player = copy.deepcopy(self.original_player)
-		self.boxes = copy.deepcopy(self.original_boxes)
+		self.state = copy.deepcopy(self.original_state)
+
 
 	def is_goal(self):
 		for place in self.storage:
@@ -80,10 +81,6 @@ class Environment():
 			previous = set([])
 		neighbors = self.get_neighbors(location)
 		previous.add(tuple(location))
-		# print(f"adding {tuple(location)}")
-		# print(previous)
-		# print(tuple(location) in previous)
-		# print('-'*len(previous))
 		if tuple(location) not in self.storage:
 			for i in range(len(neighbors)):
 				neighbor = tuple(neighbors[i])
@@ -133,7 +130,7 @@ class Environment():
 	def is_deadlock(self):
 		# if not self.frozen_nodes:
 		# 	self.frozen_nodes = set([])
-		for box in self.boxes:
+		for box in self.state[1:]:
 			if self.is_frozen(box):
 
 				#self.frozen_nodes = None
@@ -143,49 +140,49 @@ class Environment():
 		return False
 
 	def step(self, action):
-		next_position = self.player + action
+		next_position = self.state[0] + action
 		if self.map[tuple(next_position)] == MapType.BOX.value:
 			#print("BOX")
 
 			box_next_position = next_position + action
 
 			if self.map[tuple(box_next_position)] == MapType.EMPTY.value:
-				self.map[tuple(self.player)] = MapType.EMPTY.value
+				self.map[tuple(self.state[0])] = MapType.EMPTY.value
 				self.map[tuple(next_position)] = MapType.PLAYER.value
 				self.map[tuple(box_next_position)] = MapType.BOX.value
-				self.player = next_position
+				self.state[0] = next_position
 
-				for i in range(len(self.boxes)):
-					if (self.boxes[i] == next_position).all():
-						self.boxes[i] = box_next_position 
+				for i in range(len(self.state[1:])):
+					if (self.state[i+1] == next_position).all():
+						self.state[i+1] = box_next_position 
 
 				return next_position
 			else:
 				#impossible to move box
-				return self.player
+				return self.state[0]
 
 		elif self.map[tuple(next_position)] == MapType.WALL.value:
 			#print(tuple(next_position))
 			#print("WALL")
-			return self.player
+			return self.state[0]
 		elif self.map[tuple(next_position)] == MapType.EMPTY.value:
 			#print("EMPTY")
-			self.map[tuple(self.player)] = MapType.EMPTY.value
+			self.map[tuple(self.state[0])] = MapType.EMPTY.value
 			self.map[tuple(next_position)] = MapType.PLAYER.value
-			self.player = next_position
+			self.state[0] = next_position
 			return next_position
-		return self.player
+		return self.state[0]
 
 	# def step(self, evaluate=False):
 
 
 	# 	if not evaluate:
-	# 		action = self.actor.learn(State(self.player, self.boxes), self.map)
+	# 		action = self.actor.learn(State(self.state[0], self.state[1:]), self.map)
 	# 	else:
-	# 		action = self.actor.evaluate(State(self.player, self.boxes), self.map)
+	# 		action = self.actor.evaluate(State(self.state[0], self.state[1:]), self.map)
 	# 	#print(move)
 	# 	#print(move)
-	# 	next_position = action + self.player
+	# 	next_position = action + self.state[0]
 	# 	#print(next_position)
 		
 

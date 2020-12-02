@@ -71,12 +71,12 @@ def main():
 			goals_reached += 1
 			episode_bookmarks.append(num_episodes)
 			episode_iterations.append(iterations)
-			print(f"{num_episodes:5d}:goal reached.")
+			#print(f"{num_episodes:5d}:goal reached.")
 		if num_episodes % 100 == 0:
 			print(f"{num_episodes:5d}:")
 
 
-		if num_episodes > 0 and num_episodes % 100 == 0:
+		if num_episodes > 0 and num_episodes % 1000 == 0:
 			goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
 			print("-"*20)
 			print(f"evaluation:{goal}")

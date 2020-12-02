@@ -59,17 +59,17 @@ class QAgent(Agent):
 		self.replay_rate = kwargs['replay_rate']
 
 	def encode(self, state, action):
-		return str((state,action))
+		return (state.tobytes(), action.tobytes())
 
 
 	def reward(self, state, action, sokoban_map):
-		box_pushing = sokoban_map[tuple(state.player + action)] == MapType.BOX.value and sokoban_map[tuple(state.player + 2*action)] == MapType.EMPTY.value
-		push_on_goal = box_pushing and (tuple(state.player+2*action) in self.environment.storage)
+		box_pushing = sokoban_map[tuple(state[0] + action)] == MapType.BOX.value and sokoban_map[tuple(state[0] + 2*action)] == MapType.EMPTY.value
+		push_on_goal = box_pushing and (tuple(state[0]+2*action) in self.environment.storage)
 
 		# goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.environment.storage])
 		if push_on_goal:
 			goal_reach = True
-			set_difference = self.environment.storage.difference({tuple(state.player + 2 * action)})
+			set_difference = self.environment.storage.difference({tuple(state[0] + 2 * action)})
 			for place in set_difference:
 				if sokoban_map[place] != MapType.BOX.value:
 					goal_reach = False
@@ -85,20 +85,36 @@ class QAgent(Agent):
 			return -1
 
 
+	def get_actions(self, state, sokoban_map):
+		'''
+		Gets "viable" actions for the robot. i.e. one's that don't move into walls
+		'''
+		viable_actions = []
+		for action in self.actions:
+			if sokoban_map[tuple(state[0] + action)] != MapType.WALL.value:
+				viable_actions.append(action)
+
+		return viable_actions
+
+
+
 	def next_state(self, state, action, sokoban_map):
-		map_location = sokoban_map[tuple(state.player + action)]
+		map_location = sokoban_map[tuple(state[0] + action)]
 		if map_location == MapType.WALL.value:
 			next_state = state
-		elif map_location == MapType.BOX.value and sokoban_map[tuple(state.player + 2*action)] != MapType.EMPTY.value:
+		elif map_location == MapType.BOX.value and sokoban_map[tuple(state[0] + 2*action)] != MapType.EMPTY.value:
 			next_state = state
 		elif map_location == MapType.BOX.value:
-			boxes = state.boxes[:]
-			for i in range(len(boxes)):
-				if (boxes[i] == state.player+action).all():
-					boxes[i] = state.player + 2*action 
-			next_state = State(player = state.player + action, boxes = boxes)
+			next_state = np.copy(state)
+
+			
+			for i in range(len(next_state[1:])):
+				if (next_state[i+1] == state[0]+action).all():
+					next_state[i+1] = state[0] + 2*action 
+			next_state[0] = state[0] + action
 		else:
-			next_state = State(player = state.player + action, boxes = state.boxes)
+			next_state = np.copy(state)
+			next_state[0] = state[0] + action
 
 		return next_state
 
@@ -109,11 +125,12 @@ class QAgent(Agent):
 
 		next_state = self.next_state(state, action, sokoban_map)
 
-		for possible_actions in self.actions:
-			if self.encode(next_state, possible_actions) not in self.qtable:
-				self.qtable[self.encode(next_state, possible_actions)] = 0.
+		next_actions = self.get_actions(next_state, sokoban_map)
+		for possible_action in next_actions:
+			if self.encode(next_state, possible_action) not in self.qtable:
+				self.qtable[self.encode(next_state, possible_action)] = 0.
 
-		qmax = np.amax(np.array([self.qtable[self.encode(next_state, possible_actions)] for possible_actions in self.actions]))
+		qmax = np.amax(np.array([self.qtable[self.encode(next_state, possible_action)] for possible_action in next_actions]))
 		self.qtable[self.encode(state, action)] += self.learning_rate*(self.reward(state, action, sokoban_map) + self.discount_factor*qmax - self.qtable[self.encode(state, action)])
 
 		#print(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
@@ -122,7 +139,7 @@ class QAgent(Agent):
 	def learn(self, state, sokoban_map):
 		#exploration
 		if random.random() < 1.:
-			chosen_action = random.choice(self.actions)
+			chosen_action = random.choice(self.get_actions(state, sokoban_map))
 		else:
 			chosen_action = self.evaluate(state, sokoban_map)
 		self.update(state, chosen_action, sokoban_map)
@@ -131,7 +148,7 @@ class QAgent(Agent):
 	def evaluate(self, state, sokoban_map):
 		chosen_action = None
 		chosen_value = 0.
-		for possible_action in self.actions:
+		for possible_action in self.get_actions(state, sokoban_map):
 
 			
 			if self.encode(state, possible_action) not in self.qtable:
@@ -159,7 +176,7 @@ class QAgent(Agent):
 		experience = random.choice(self.experience_cache)
 		self.environment.reset()
 		for action in experience:
-			self.update(State(player=self.environment.player, boxes=self.environment.boxes), action, self.environment.map)
+			self.update(self.environment.state, action, self.environment.map)
 			# if random.random() < 0.05:
 			# 	action = self.learn(State(player=self.environment.player, boxes=self.environment.boxes), self.environment.map)
 			# else:
@@ -176,9 +193,9 @@ class QAgent(Agent):
 		num_iterations = 0
 		while not self.environment.is_goal() and not self.environment.is_deadlock():
 			if not evaluate:
-				action = self.learn(State(player=self.environment.player, boxes=self.environment.boxes), self.environment.map)
+				action = self.learn(self.environment.state, self.environment.map)
 			else:
-				action = self.evaluate(State(player=self.environment.player, boxes=self.environment.boxes), self.environment.map)
+				action = self.evaluate(self.environment.state, self.environment.map)
 			self.environment.step(action)
 
 			if draw:
