@@ -146,7 +146,8 @@ class Environment():
 		# 	self.frozen_nodes = set([])
 		self.state_hash = self.state.tobytes()
 
-		self.deadlock_table[self.state_hash] = {}
+		if self.state_hash not in self.deadlock_table:
+			self.deadlock_table[self.state_hash] = {}
 		for box in self.state[1:]:
 			if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
 				return True
