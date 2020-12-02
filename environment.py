@@ -22,6 +22,15 @@ LEFT = np.array([-1, 0])
 RIGHT = np.array([1, 0])
 DIRECTIONS = [UP, RIGHT, DOWN, LEFT]
 
+def direction_to_str(direction):
+	if all(direction == UP):
+		return "UP"
+	elif all(direction == DOWN):
+		return "DOWN"
+	elif all(direction == LEFT):
+		return "LEFT"
+	return "RIGHT"
+
 class Environment():
 
 
@@ -43,19 +52,14 @@ class Environment():
 		# self.state[0] = player
 		# self.state[1:] = boxes
 		self.state = np.array([player, *boxes])
-		self.state_hash = self.state.tobytes()
+		self.state_hash = self.state.tobytes() #inbetween variable for hashing
 
-
+		self.box_in_goal = [False for box in boxes]
 
 		self.deadlock_table = {}
 
 		self.original_map = copy.deepcopy(self.map)
 		self.original_state = copy.deepcopy(self.state)
-
-
-
-
-
 
 
 	def reset(self):
@@ -64,6 +68,7 @@ class Environment():
 		# print(f"reset_player:{self.original_player}")
 		self.map = copy.deepcopy(self.original_map)
 		self.state = copy.deepcopy(self.original_state)
+		self.box_in_goal = [False for box in self.state[1:]]
 
 
 	def is_goal(self):
@@ -160,6 +165,8 @@ class Environment():
 		#self.frozen_nodes = None
 		return False
 
+
+
 	def step(self, action):
 		next_position = self.state[0] + action
 		if self.map[tuple(next_position)] == MapType.BOX.value:
@@ -176,6 +183,8 @@ class Environment():
 				for i in range(len(self.state[1:])):
 					if (self.state[i+1] == next_position).all():
 						self.state[i+1] = box_next_position 
+					if tuple(box_next_position) in self.storage:
+						self.box_in_goal[i] = True
 
 				return next_position
 			else:

@@ -48,25 +48,32 @@ class SimpleAgent(Agent):
 class QAgent(Agent):
 
 
-	def __init__(self, environment, *args, **kwargs):
+	def __init__(self, environment, learning_rate = 1., discount_factor = 0.95, replay_rate = 0.2, verbose = False,*args, **kwargs):
 		#super()
 		super().__init__(environment, args, kwargs)
 		self.qtable = {}
 
 		self.experience_cache = []
-		self.learning_rate = kwargs['learning_rate']
-		self.discount_factor = kwargs['discount_factor']
-		self.replay_rate = kwargs['replay_rate']
+		self.learning_rate = learning_rate
+		self.discount_factor = discount_factor
+		self.replay_rate = replay_rate
+		self.verbose = verbose
 
 	def encode(self, state, action):
 		return (state.tobytes(), action.tobytes())
 
+	def count_box_on_goal(self):
+		count = 0
+		for box in self.environment.state[1:]:
+			if tuple(box) in self.environment.storage:
+				count += 1
 
+		return count
 	def reward(self, state, action, sokoban_map):
 		box_pushing = sokoban_map[tuple(state[0] + action)] == MapType.BOX.value and sokoban_map[tuple(state[0] + 2*action)] == MapType.EMPTY.value
 		push_on_goal = box_pushing and (tuple(state[0]+2*action) in self.environment.storage)
 
-		# goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.environment.storage])
+		goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.environment.storage])
 		if push_on_goal:
 			goal_reach = True
 			set_difference = self.environment.storage.difference({tuple(state[0] + 2 * action)})
@@ -80,21 +87,25 @@ class QAgent(Agent):
 			#print("reward for finishing puzzle")
 			return 500.
 		elif push_on_goal:
-			return 50.
+			return 50. 
 		elif box_pushing:
 			return -0.5
 		elif self.environment.is_deadlock():
+			#print("deadlock reward")
 			return -2
 		else:
 			return -1
 
-
 	def get_actions(self, state, sokoban_map):
 		'''
-		Gets "viable" actions for the robot. i.e. one's that don't move into walls
+		Gets "viable" actions for the robot. i.e. one's that don't move into walls or deadlocks
 		'''
 		viable_actions = []
 		for action in self.actions:
+			state_hash = self.next_state(state, action, sokoban_map).tobytes()
+			if state_hash in self.environment.deadlock_table and all([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
+				continue
+
 			if sokoban_map[tuple(state[0] + action)] != MapType.WALL.value:
 				viable_actions.append(action)
 
@@ -142,7 +153,7 @@ class QAgent(Agent):
 
 	def learn(self, state, sokoban_map):
 		#exploration
-		if random.random() < 0.95: #greedy rate
+		if random.random() < 0.99: #greedy rate
 			chosen_action = random.choice(self.get_actions(state, sokoban_map))
 		else:
 			chosen_action = self.evaluate(state, sokoban_map)
@@ -154,6 +165,8 @@ class QAgent(Agent):
 		chosen_value = 0.
 		for possible_action in self.get_actions(state, sokoban_map):
 
+			if self.verbose:
+				print(f"{environment.direction_to_str(possible_action)}:{self.qtable[self.encode(state, possible_action)]}")
 			
 			if self.encode(state, possible_action) not in self.qtable:
 				self.qtable[self.encode(state, possible_action)] = 0. #represents an unseen state... not ideal while evaluating
@@ -230,7 +243,7 @@ class QAgent(Agent):
 			if len(self.experience_cache) > 5: #limit to 5 experiences
 				self.experience_cache.pop(0)
 
-		if self.experience_cache and random.random() < self.replay_rate:
+		if not evaluate and self.experience_cache and random.random() < self.replay_rate:
 			self.replay()
 
 

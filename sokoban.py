@@ -56,7 +56,7 @@ def main():
 				player = np.array([int(row[0]), int(row[1])])
 
 	environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-	agent = QAgent(environment = environment, learning_rate = 1.0, discount_factor=0.95, replay_rate = 0.2)
+	agent = QAgent(environment = environment, learning_rate = 1.0, discount_factor=0.95, replay_rate = 0.2, verbose=args.verbose)
 
 	episode_bookmarks = []
 	episode_iterations = []
@@ -106,5 +106,6 @@ if __name__ == '__main__':
 	parser.add_argument('--episodes', '-e', action='store', type=int, default=5000)
 	parser.add_argument('--save_figure', '-s', action='store_true')
 	parser.add_argument('--draw', '-d', action='store_true')
+	parser.add_argument('--verbose', '-v', action='store_true')
 	args = parser.parse_args()
 	main()
