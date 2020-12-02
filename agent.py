@@ -81,6 +81,10 @@ class QAgent(Agent):
 			return 500.
 		elif push_on_goal:
 			return 50.
+		elif box_pushing:
+			return -0.5
+		elif self.environment.is_deadlock():
+			return -2
 		else:
 			return -1
 
@@ -138,7 +142,7 @@ class QAgent(Agent):
 
 	def learn(self, state, sokoban_map):
 		#exploration
-		if random.random() < 1.:
+		if random.random() < 0.95: #greedy rate
 			chosen_action = random.choice(self.get_actions(state, sokoban_map))
 		else:
 			chosen_action = self.evaluate(state, sokoban_map)
@@ -191,6 +195,8 @@ class QAgent(Agent):
 		self.environment.reset()
 
 		num_iterations = 0
+		pstate_1 = None
+		pstate_2 = None
 		while not self.environment.is_goal() and not self.environment.is_deadlock():
 			if not evaluate:
 				action = self.learn(self.environment.state, self.environment.map)
@@ -203,6 +209,16 @@ class QAgent(Agent):
 
 			if num_iterations > max_iterations:
 				break
+
+			if evaluate:
+				if (pstate_1 == self.environment.state).all() or (pstate_2 == self.environment.state).all():
+					break
+
+				pstate_2 = np.copy(pstate_1)
+				pstate_1 = np.copy(self.environment.state)
+				
+
+
 
 			action_sequence.append(action)
 			num_iterations += 1

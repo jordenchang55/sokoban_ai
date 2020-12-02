@@ -43,11 +43,15 @@ class Environment():
 		# self.state[0] = player
 		# self.state[1:] = boxes
 		self.state = np.array([player, *boxes])
+		self.state_hash = self.state.tobytes()
+
+
+
+		self.deadlock_table = {}
 
 		self.original_map = copy.deepcopy(self.map)
-
-
 		self.original_state = copy.deepcopy(self.state)
+
 
 
 
@@ -77,8 +81,12 @@ class Environment():
 
 
 	def is_frozen(self, location, previous=None):
-		if not previous:
-			previous = set([])
+
+		if location.tobytes() in self.deadlock_table[self.state_hash]:
+			return self.deadlock_table[self.state_hash][location.tobytes()]
+
+		# if not previous:
+		# 	previous = set([])
 		neighbors = self.get_neighbors(location)
 		previous.add(tuple(location))
 		if tuple(location) not in self.storage:
@@ -91,21 +99,23 @@ class Environment():
 					return True
 				elif self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.BOX.value:
 					#print("case 2")
-
 					if next_neighbor in previous:
-						#dependency cycle!
+						#depndency cycle!
+						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
-					#print(previous)
 					if self.is_frozen(np.array(next_neighbor), previous):
+						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
 				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.WALL.value:
 					#print("case 3")
 
 					if neighbor in previous:
 						#dependency cycle!
+						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
 
 					if self.is_frozen(np.array(neighbor), previous):
+						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
 				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.BOX.value:
 					# print("case 4")
@@ -120,21 +130,31 @@ class Environment():
 					else:
 						frozen_next_neighbor = self.is_frozen(np.array(next_neighbor), previous)
 
+
 					if frozen_neighbor and frozen_next_neighbor:
+						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
 
 		previous.remove(tuple(location))
+		self.deadlock_table[self.state_hash][location.tobytes()] = False
+
 		return False
 
 
 	def is_deadlock(self):
 		# if not self.frozen_nodes:
 		# 	self.frozen_nodes = set([])
+		self.state_hash = self.state.tobytes()
+
+		self.deadlock_table[self.state_hash] = {}
 		for box in self.state[1:]:
-			if self.is_frozen(box):
+			if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
+				return True
+			elif self.is_frozen(box, previous=set([])):
 
 				#self.frozen_nodes = None
 				return True
+
 
 		#self.frozen_nodes = None
 		return False
