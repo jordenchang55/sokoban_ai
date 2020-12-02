@@ -56,7 +56,7 @@ def main():
 				player = np.array([int(row[0]), int(row[1])])
 
 	environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-	agent = QAgent(environment = environment, learning_rate = 1., discount_factor=0.9, replay_rate = 0.2)
+	agent = QAgent(environment = environment, learning_rate = 0.15, discount_factor=0.9, replay_rate = 0.2)
 
 	episode_bookmarks = []
 	episode_iterations = []

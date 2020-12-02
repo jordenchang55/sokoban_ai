@@ -85,25 +85,25 @@ class Environment():
 				if self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.WALL.value:
 					return True
 				elif self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.BOX.value:
-					if next_neighbor in previous:
+					if tuple(next_neighbor) in previous:
 						#dependency cycle!
 						return True
-
+					print(previous)
 					if self.is_frozen(np.array(next_neighbor), previous):
 						return True
 				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.WALL.value:
-					if neighbor in previous:
+					if tuple(neighbor) in previous:
 						#dependency cycle!
 						return True
 
 					if self.is_frozen(np.array(neighbor), previous):
 						return True
 				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.BOX.value:
-					if neighbor not in previous:
+					if tuple(neighbor) not in previous:
 						frozen_neighbor = self.is_frozen(np.array(neighbor), previous)
 					else:
 						frozen_neighbor = True
-					if next_neighbor not in previous:
+					if tuple(next_neighbor) not in previous:
 						frozen_next_neighbor = self.is_frozen(np.array(neighbor), previous)
 					else:
 						frozen_next_neighbor = True
