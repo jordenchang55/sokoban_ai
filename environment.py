@@ -9,11 +9,16 @@ import copy
 
 
 
-class MapType(Enum):
-	EMPTY = 0
-	PLAYER = 1
-	BOX = 2
-	WALL = 3
+# class MapType(Enum):
+# 	EMPTY = 0
+# 	PLAYER = 1
+# 	BOX = 2
+# 	WALL = 3
+
+EMPTY = 0
+PLAYER = 1
+BOX = 2
+WALL = 3
 
 
 UP = np.array([0,1])
@@ -45,10 +50,10 @@ class Environment():
 
 
 		for wall in walls:
-			self.map[wall] = MapType.WALL.value
+			self.map[wall] = WALL
 		for box in boxes:
-			self.map[box] = MapType.BOX.value
-		self.map[tuple(player)] = MapType.PLAYER.value
+			self.map[box] = BOX
+		self.map[tuple(player)] = PLAYER
 		# self.state[0] = player
 		# self.state[1:] = boxes
 		self.state = np.array([player, *boxes])
@@ -73,7 +78,7 @@ class Environment():
 
 	def is_goal(self):
 		for place in self.storage:
-			if self.map[place] != MapType.BOX.value:
+			if self.map[place] != BOX:
 				return False
 
 		return True
@@ -99,10 +104,10 @@ class Environment():
 				neighbor = tuple(neighbors[i])
 				next_neighbor = tuple(neighbors[(i+1)%len(neighbors)])
 
-				if self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.WALL.value:
+				if self.map[neighbor] == WALL and self.map[next_neighbor] == WALL:
 					#print("case 1")
 					return True
-				elif self.map[neighbor] == MapType.WALL.value and self.map[next_neighbor] == MapType.BOX.value:
+				elif self.map[neighbor] == WALL and self.map[next_neighbor] == BOX:
 					#print("case 2")
 					if next_neighbor in previous:
 						#depndency cycle!
@@ -111,7 +116,7 @@ class Environment():
 					if self.is_frozen(np.array(next_neighbor), previous):
 						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
-				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.WALL.value:
+				elif self.map[neighbor] == BOX and self.map[next_neighbor] == WALL:
 					#print("case 3")
 
 					if neighbor in previous:
@@ -122,7 +127,7 @@ class Environment():
 					if self.is_frozen(np.array(neighbor), previous):
 						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
-				elif self.map[neighbor] == MapType.BOX.value and self.map[next_neighbor] == MapType.BOX.value:
+				elif self.map[neighbor] == BOX and self.map[next_neighbor] == BOX:
 					# print("case 4")
 					# print(neighbor in previous)
 					# print(next_neighbor in previous)
@@ -169,15 +174,15 @@ class Environment():
 
 	def step(self, action):
 		next_position = self.state[0] + action
-		if self.map[tuple(next_position)] == MapType.BOX.value:
+		if self.map[tuple(next_position)] == BOX:
 			#print("BOX")
 
 			box_next_position = next_position + action
 
-			if self.map[tuple(box_next_position)] == MapType.EMPTY.value:
-				self.map[tuple(self.state[0])] = MapType.EMPTY.value
-				self.map[tuple(next_position)] = MapType.PLAYER.value
-				self.map[tuple(box_next_position)] = MapType.BOX.value
+			if self.map[tuple(box_next_position)] == EMPTY:
+				self.map[tuple(self.state[0])] = EMPTY
+				self.map[tuple(next_position)] = PLAYER
+				self.map[tuple(box_next_position)] = BOX
 				self.state[0] = next_position
 
 				for i in range(len(self.state[1:])):
@@ -191,14 +196,14 @@ class Environment():
 				#impossible to move box
 				return self.state[0]
 
-		elif self.map[tuple(next_position)] == MapType.WALL.value:
+		elif self.map[tuple(next_position)] == WALL:
 			#print(tuple(next_position))
 			#print("WALL")
 			return self.state[0]
-		elif self.map[tuple(next_position)] == MapType.EMPTY.value:
+		elif self.map[tuple(next_position)] == EMPTY:
 			#print("EMPTY")
-			self.map[tuple(self.state[0])] = MapType.EMPTY.value
-			self.map[tuple(next_position)] = MapType.PLAYER.value
+			self.map[tuple(self.state[0])] = EMPTY
+			self.map[tuple(next_position)] = PLAYER
 			self.state[0] = next_position
 			return next_position
 		return self.state[0]
@@ -237,13 +242,13 @@ class Environment():
 		for i in range(self.map.shape[0]):
 			for j in range(self.map.shape[1]):
 				#print((i,j))
-				if self.map[i,j] == MapType.WALL.value:
+				if self.map[i,j] == WALL:
 					rect = patches.Rectangle((i+0.5, j+0.5),-1,-1,linewidth=0.5,edgecolor='slategray',facecolor='slategray')
 					ax.add_patch(rect)
-				elif self.map[i,j] == MapType.BOX.value:
+				elif self.map[i,j] == BOX:
 					rect = patches.Rectangle((i+0.5, j+0.5), -1, -1, linewidth=0.5, edgecolor='tan', facecolor='tan')
 					ax.add_patch(rect)
-				elif self.map[i,j] == MapType.PLAYER.value:
+				elif self.map[i,j] == PLAYER:
 					plt.plot(i, j, 'o', color='orange')
 
 		for place in self.storage:

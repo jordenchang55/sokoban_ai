@@ -4,7 +4,7 @@ import random
 import numpy as np
 
 import environment
-from environment import MapType
+#from environment import MapType
 
 
 from collections import namedtuple
@@ -70,15 +70,15 @@ class QAgent(Agent):
 
 		return count
 	def reward(self, state, action, sokoban_map):
-		box_pushing = sokoban_map[tuple(state[0] + action)] == MapType.BOX.value and sokoban_map[tuple(state[0] + 2*action)] == MapType.EMPTY.value
+		box_pushing = sokoban_map[tuple(state[0] + action)] == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] == environment.EMPTY
 		push_on_goal = box_pushing and (tuple(state[0]+2*action) in self.environment.storage)
 
-		goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.environment.storage])
+		goal_reach = all([sokoban_map[place] == environment.BOX for place in self.environment.storage])
 		if push_on_goal:
 			goal_reach = True
 			set_difference = self.environment.storage.difference({tuple(state[0] + 2 * action)})
 			for place in set_difference:
-				if sokoban_map[place] != MapType.BOX.value:
+				if sokoban_map[place] != environment.BOX:
 					goal_reach = False
 		else:
 			goal_reach = False
@@ -106,7 +106,7 @@ class QAgent(Agent):
 			if state_hash in self.environment.deadlock_table and all([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
 				continue
 
-			if sokoban_map[tuple(state[0] + action)] != MapType.WALL.value:
+			if sokoban_map[tuple(state[0] + action)] != environment.WALL:
 				viable_actions.append(action)
 
 		return viable_actions
@@ -115,11 +115,11 @@ class QAgent(Agent):
 
 	def next_state(self, state, action, sokoban_map):
 		map_location = sokoban_map[tuple(state[0] + action)]
-		if map_location == MapType.WALL.value:
+		if map_location == environment.WALL:
 			next_state = state
-		elif map_location == MapType.BOX.value and sokoban_map[tuple(state[0] + 2*action)] != MapType.EMPTY.value:
+		elif map_location == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] != environment.EMPTY:
 			next_state = state
-		elif map_location == MapType.BOX.value:
+		elif map_location == environment.BOX:
 			next_state = np.copy(state)
 
 			

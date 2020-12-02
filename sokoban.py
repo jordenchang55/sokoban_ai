@@ -9,7 +9,7 @@ import numpy as np
 import agent
 from agent import QAgent
 from environment import Environment
-from environment import MapType
+#from environment import MapType
 
 # def debug_print(fmt_string):
 # 	print(fmt_string)
