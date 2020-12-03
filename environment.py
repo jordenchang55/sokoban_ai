@@ -56,10 +56,12 @@ class Environment():
 		self.map[tuple(player)] = PLAYER
 		# self.state[0] = player
 		# self.state[1:] = boxes
-		self.state = np.array([player, *boxes])
+
+		#player, num_score, boxes
+		self.state = np.array([player, [0,0], *boxes])
 		self.state_hash = self.state.tobytes() #inbetween variable for hashing
 
-		self.box_in_goal = [False for box in boxes]
+		self.has_scored = np.zeros(len(boxes))
 
 		self.deadlock_table = {}
 
@@ -73,7 +75,7 @@ class Environment():
 		# print(f"reset_player:{self.original_player}")
 		self.map = copy.deepcopy(self.original_map)
 		self.state = copy.deepcopy(self.original_state)
-		self.box_in_goal = [False for box in self.state[1:]]
+		self.has_scored = np.zeros(len(self.state[2:]))
 
 
 	def is_goal(self):
@@ -158,7 +160,7 @@ class Environment():
 
 		if self.state_hash not in self.deadlock_table:
 			self.deadlock_table[self.state_hash] = {}
-		for box in self.state[1:]:
+		for index, box in enumerate(self.state[2:]):
 			if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
 				return True
 			elif self.is_frozen(box, previous=set([])):
@@ -185,27 +187,33 @@ class Environment():
 				self.map[tuple(box_next_position)] = BOX
 				self.state[0] = next_position
 
-				for i in range(len(self.state[1:])):
-					if (self.state[i+1] == next_position).all():
-						self.state[i+1] = box_next_position 
-					if tuple(box_next_position) in self.storage:
-						self.box_in_goal[i] = True
+				for i in range(len(self.state[2:])):
+					if (self.state[i+2] == next_position).all():
+						self.state[i+2] = box_next_position 
+						if tuple(box_next_position) in self.storage:
+							self.has_scored[i] = 1.
+						break
 
-				return next_position
+
+				#return next_position
 			else:
+				pass
 				#impossible to move box
-				return self.state[0]
+				#return self.state[0]
 
 		elif self.map[tuple(next_position)] == WALL:
+			pass
 			#print(tuple(next_position))
 			#print("WALL")
-			return self.state[0]
+			#return self.state[0]
 		elif self.map[tuple(next_position)] == EMPTY:
 			#print("EMPTY")
 			self.map[tuple(self.state[0])] = EMPTY
 			self.map[tuple(next_position)] = PLAYER
 			self.state[0] = next_position
-			return next_position
+			#return next_position
+
+		self.state[1,0] = np.sum(self.has_scored)
 		return self.state[0]
 
 	# def step(self, evaluate=False):
@@ -227,7 +235,7 @@ class Environment():
 
 
 	def draw(self, save_figure = False):
-	
+		#print(f"num_score:{self.state[1,0]}")
 		ax = plt.gca()
 		ax.clear()
 		#create square boundary
@@ -245,11 +253,20 @@ class Environment():
 				if self.map[i,j] == WALL:
 					rect = patches.Rectangle((i+0.5, j+0.5),-1,-1,linewidth=0.5,edgecolor='slategray',facecolor='slategray')
 					ax.add_patch(rect)
-				elif self.map[i,j] == BOX:
-					rect = patches.Rectangle((i+0.5, j+0.5), -1, -1, linewidth=0.5, edgecolor='tan', facecolor='tan')
-					ax.add_patch(rect)
+
 				elif self.map[i,j] == PLAYER:
 					plt.plot(i, j, 'o', color='orange')
+
+
+		for index, box in enumerate(self.state[2:]):
+			
+			if self.is_frozen(box, set([])):
+				rect = patches.Rectangle((box[0]+0.5, box[1]+0.5), -1, -1, linewidth=0.5, edgecolor='red', facecolor='red')
+			elif self.has_scored[index] == 1:
+				rect = patches.Rectangle((box[0]+0.5, box[1]+0.5), -1, -1, linewidth=0.5, edgecolor='green', facecolor='green')
+			else:
+				rect = patches.Rectangle((box[0]+0.5, box[1]+0.5), -1, -1, linewidth=0.5, edgecolor='tan', facecolor='tan')
+			ax.add_patch(rect)
 
 		for place in self.storage:
 			circle = patches.Circle(place, 0.05, edgecolor='limegreen', facecolor='limegreen')

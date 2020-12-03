@@ -64,7 +64,7 @@ class QAgent(Agent):
 
 	def count_box_on_goal(self):
 		count = 0
-		for box in self.environment.state[1:]:
+		for box in self.environment.state[2:]:
 			if tuple(box) in self.environment.storage:
 				count += 1
 
@@ -88,6 +88,7 @@ class QAgent(Agent):
 			return 500.
 		elif push_on_goal:
 			return 50. 
+
 		elif box_pushing:
 			return -0.5
 		elif self.environment.is_deadlock():
@@ -123,14 +124,20 @@ class QAgent(Agent):
 			next_state = np.copy(state)
 
 			
-			for i in range(len(next_state[1:])):
-				if (next_state[i+1] == state[0]+action).all():
-					next_state[i+1] = state[0] + 2*action 
+			for i in range(len(next_state[2:])):
+				if (next_state[i+2] == state[0]+action).all():
+					next_state[i+2] = state[0] + 2*action 
+
+					if self.environment.has_scored[i] == 0 and tuple(next_state[i+2]) in self.environment.storage:
+						#if agent hasn't scored this box but is about to score the box
+						next_state[1,0] += 1
+					break
 			next_state[0] = state[0] + action
 		else:
 			next_state = np.copy(state)
 			next_state[0] = state[0] + action
 
+		#print(next_state)
 		return next_state
 
 	def update(self, state, action, sokoban_map):
