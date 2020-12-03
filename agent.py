@@ -70,8 +70,16 @@ class QAgent(Agent):
 
 		return count
 	def reward(self, state, action, sokoban_map):
-		box_pushing = sokoban_map[tuple(state[0] + action)] == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] == environment.EMPTY
+		box_position = tuple(state[0] + action)
+		box_pushing = sokoban_map[box_position] == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] == environment.EMPTY
 		push_on_goal = box_pushing and (tuple(state[0]+2*action) in self.environment.storage)
+
+		not_scored = False
+		for i in range(len(self.environment.state[2:])):
+			if (box_position == self.environment.state[2+i]).all():
+				not_scored = not self.environment.has_scored[i]
+
+
 
 		goal_reach = all([sokoban_map[place] == environment.BOX for place in self.environment.storage])
 		if push_on_goal:
@@ -86,14 +94,14 @@ class QAgent(Agent):
 		if goal_reach:
 			#print("reward for finishing puzzle")
 			return 500.
-		elif push_on_goal:
+		elif push_on_goal and not_scored:
 			return 50. 
 
-		elif box_pushing:
-			return -0.5
-		elif self.environment.is_deadlock():
-			#print("deadlock reward")
-			return -2
+		# elif box_pushing:
+		# 	return -0.5
+		# elif self.environment.is_deadlock():
+		# 	#print("deadlock reward")
+		# 	return -2
 		else:
 			return -1
 
@@ -103,8 +111,9 @@ class QAgent(Agent):
 		'''
 		viable_actions = []
 		for action in self.actions:
-			state_hash = self.next_state(state, action, sokoban_map).tobytes()
-			if state_hash in self.environment.deadlock_table and all([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
+			next_state = self.next_state(state, action, sokoban_map)
+			next_boxes_hash = next_state[2:].tobytes()
+			if next_boxes_hash in self.environment.deadlock_table and all([self.environment.deadlock_table[next_boxes_hash][key] for key in self.environment.deadlock_table[next_boxes_hash]]):
 				continue
 
 			if sokoban_map[tuple(state[0] + action)] != environment.WALL:
@@ -152,7 +161,10 @@ class QAgent(Agent):
 			if self.encode(next_state, possible_action) not in self.qtable:
 				self.qtable[self.encode(next_state, possible_action)] = 0.
 
-		qmax = np.amax(np.array([self.qtable[self.encode(next_state, possible_action)] for possible_action in next_actions]))
+		if next_actions:
+			qmax = np.amax(np.array([self.qtable[self.encode(next_state, possible_action)] for possible_action in next_actions]))
+		else:
+			qmax = -1.
 		self.qtable[self.encode(state, action)] += self.learning_rate*(self.reward(state, action, sokoban_map) + self.discount_factor*qmax - self.qtable[self.encode(state, action)])
 
 		#print(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
@@ -160,7 +172,7 @@ class QAgent(Agent):
 
 	def learn(self, state, sokoban_map):
 		#exploration
-		if random.random() < 0.99: #greedy rate
+		if random.random() < 0.20: #greedy rate
 			chosen_action = random.choice(self.get_actions(state, sokoban_map))
 		else:
 			chosen_action = self.evaluate(state, sokoban_map)
@@ -217,7 +229,10 @@ class QAgent(Agent):
 		num_iterations = 0
 		pstate_1 = None
 		pstate_2 = None
-		while not self.environment.is_goal() and not self.environment.is_deadlock():
+		while not self.environment.is_goal():
+			if self.environment.is_deadlock():
+				self.environment.undo()
+
 			if not evaluate:
 				action = self.learn(self.environment.state, self.environment.map)
 			else:

@@ -36,6 +36,16 @@ def direction_to_str(direction):
 		return "LEFT"
 	return "RIGHT"
 
+
+class Move():
+
+	def __init__(self, previous_state, previous_scores, action, box_moved = False):
+		self.action = action
+		self.previous_state = previous_state
+		self.previous_scores = previous_scores
+		self.box_moved = box_moved
+
+
 class Environment():
 
 
@@ -59,7 +69,7 @@ class Environment():
 
 		#player, num_score, boxes
 		self.state = np.array([player, [0,0], *boxes])
-		self.state_hash = self.state.tobytes() #inbetween variable for hashing
+		self.boxes_hash = self.state[2:].tobytes() #inbetween variable for hashing
 
 		self.has_scored = np.zeros(len(boxes))
 
@@ -67,6 +77,9 @@ class Environment():
 
 		self.original_map = copy.deepcopy(self.map)
 		self.original_state = copy.deepcopy(self.state)
+
+
+		self.previous_move = None
 
 
 	def reset(self):
@@ -94,8 +107,8 @@ class Environment():
 
 	def is_frozen(self, location, previous=None):
 
-		if location.tobytes() in self.deadlock_table[self.state_hash]:
-			return self.deadlock_table[self.state_hash][location.tobytes()]
+		if location.tobytes() in self.deadlock_table[self.boxes_hash]:
+			return self.deadlock_table[self.boxes_hash][location.tobytes()]
 
 		# if not previous:
 		# 	previous = set([])
@@ -107,27 +120,29 @@ class Environment():
 				next_neighbor = tuple(neighbors[(i+1)%len(neighbors)])
 
 				if self.map[neighbor] == WALL and self.map[next_neighbor] == WALL:
+					self.deadlock_table[self.boxes_hash][location.tobytes()] = True
+
 					#print("case 1")
 					return True
 				elif self.map[neighbor] == WALL and self.map[next_neighbor] == BOX:
 					#print("case 2")
 					if next_neighbor in previous:
 						#depndency cycle!
-						self.deadlock_table[self.state_hash][location.tobytes()] = True
+						self.deadlock_table[self.boxes_hash][location.tobytes()] = True
 						return True
 					if self.is_frozen(np.array(next_neighbor), previous):
-						self.deadlock_table[self.state_hash][location.tobytes()] = True
+						self.deadlock_table[self.boxes_hash][location.tobytes()] = True
 						return True
 				elif self.map[neighbor] == BOX and self.map[next_neighbor] == WALL:
 					#print("case 3")
 
 					if neighbor in previous:
 						#dependency cycle!
-						self.deadlock_table[self.state_hash][location.tobytes()] = True
+						self.deadlock_table[self.boxes_hash][location.tobytes()] = True
 						return True
 
 					if self.is_frozen(np.array(neighbor), previous):
-						self.deadlock_table[self.state_hash][location.tobytes()] = True
+						self.deadlock_table[self.boxes_hash][location.tobytes()] = True
 						return True
 				elif self.map[neighbor] == BOX and self.map[next_neighbor] == BOX:
 					# print("case 4")
@@ -144,11 +159,11 @@ class Environment():
 
 
 					if frozen_neighbor and frozen_next_neighbor:
-						self.deadlock_table[self.state_hash][location.tobytes()] = True
+						self.deadlock_table[self.boxes_hash][location.tobytes()] = True
 						return True
 
 		previous.remove(tuple(location))
-		self.deadlock_table[self.state_hash][location.tobytes()] = False
+		self.deadlock_table[self.boxes_hash][location.tobytes()] = False
 
 		return False
 
@@ -156,12 +171,12 @@ class Environment():
 	def is_deadlock(self):
 		# if not self.frozen_nodes:
 		# 	self.frozen_nodes = set([])
-		self.state_hash = self.state.tobytes()
+		self.boxes_hash = self.state[2:].tobytes()
 
-		if self.state_hash not in self.deadlock_table:
-			self.deadlock_table[self.state_hash] = {}
+		if self.boxes_hash not in self.deadlock_table:
+			self.deadlock_table[self.boxes_hash] = {}
 		for index, box in enumerate(self.state[2:]):
-			if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
+			if box.tobytes() in self.deadlock_table[self.boxes_hash] and self.deadlock_table[self.boxes_hash][box.tobytes()]:
 				return True
 			elif self.is_frozen(box, previous=set([])):
 
@@ -172,9 +187,23 @@ class Environment():
 		#self.frozen_nodes = None
 		return False
 
+	def undo(self):
+		if self.previous_move is None:
+			self.reset() ##no previous move? reset
+		else:
+			self.state = self.previous_move.previous_state
+			self.has_scored = self.previous_move.previous_scores
+
+			#undo movement
+			self.map[tuple(self.state[0])] = PLAYER
+			if self.previous_move.box_moved:
+				self.map[tuple(self.state[0] + self.previous_move.action)] = BOX
+				self.map[tuple(self.state[0] + 2*self.previous_move.action)] = EMPTY
 
 
 	def step(self, action):
+		self.previous_move = Move(copy.deepcopy(self.state), copy.deepcopy(self.has_scored), action)##EXPENSIVE
+
 		next_position = self.state[0] + action
 		if self.map[tuple(next_position)] == BOX:
 			#print("BOX")
@@ -182,6 +211,7 @@ class Environment():
 			box_next_position = next_position + action
 
 			if self.map[tuple(box_next_position)] == EMPTY:
+				self.previous_move.box_moved = True
 				self.map[tuple(self.state[0])] = EMPTY
 				self.map[tuple(next_position)] = PLAYER
 				self.map[tuple(box_next_position)] = BOX
