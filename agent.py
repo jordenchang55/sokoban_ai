@@ -1,14 +1,17 @@
 import random
-import random
+from collections import namedtuple
 
 import numpy as np
+import tensorflow as tf
 
 import environment
-#from environment import MapType
+from network import Network, ReplayBuffer
 
+# from environment import MapType
 
-from collections import namedtuple
 State = namedtuple('State', ['player', 'boxes'])
+random.seed(2)
+
 
 class Agent():
 	actions = [environment.UP, environment.RIGHT, environment.DOWN, environment.LEFT]
@@ -16,16 +19,11 @@ class Agent():
 	def __init__(self, environment, *args, **kwargs):
 		self.environment = environment
 
-
 	def learn(self, state, sokoban_map):
-
 		return random.choice(self.actions)
-
 
 	def evaluate(self, state, sokoban_map):
 		return random.choice(self.actions)
-
-
 
 
 class SimpleAgent(Agent):
@@ -36,20 +34,15 @@ class SimpleAgent(Agent):
 	def heuristic(self, state, sokoban_map):
 		pass
 
-
 	def get_action(self, state, sokoban_map):
-
-
-		pass	
-
-
+		pass
 
 
 class QAgent(Agent):
 
-
-	def __init__(self, environment, learning_rate = 1., discount_factor = 0.95, replay_rate = 0.2, verbose = False,*args, **kwargs):
-		#super()
+	def __init__(self, environment, learning_rate=1., discount_factor=0.95, replay_rate=0.2, verbose=False, *args,
+				 **kwargs):
+		# super()
 		super().__init__(environment, args, kwargs)
 		self.qtable = {}
 
@@ -69,9 +62,11 @@ class QAgent(Agent):
 				count += 1
 
 		return count
+
 	def reward(self, state, action, sokoban_map):
-		box_pushing = sokoban_map[tuple(state[0] + action)] == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] == environment.EMPTY
-		push_on_goal = box_pushing and (tuple(state[0]+2*action) in self.environment.storage)
+		box_pushing = sokoban_map[tuple(state[0] + action)] == environment.BOX and sokoban_map[
+			tuple(state[0] + 2 * action)] == environment.EMPTY
+		push_on_goal = box_pushing and (tuple(state[0] + 2 * action) in self.environment.storage)
 
 		goal_reach = all([sokoban_map[place] == environment.BOX for place in self.environment.storage])
 		if push_on_goal:
@@ -84,14 +79,14 @@ class QAgent(Agent):
 			goal_reach = False
 
 		if goal_reach:
-			#print("reward for finishing puzzle")
+			# print("reward for finishing puzzle")
 			return 500.
 		elif push_on_goal:
-			return 50. 
+			return 50.
 		elif box_pushing:
 			return -0.5
 		elif self.environment.is_deadlock():
-			#print("deadlock reward")
+			# print("deadlock reward")
 			return -2
 		else:
 			return -1
@@ -103,7 +98,9 @@ class QAgent(Agent):
 		viable_actions = []
 		for action in self.actions:
 			state_hash = self.next_state(state, action, sokoban_map).tobytes()
-			if state_hash in self.environment.deadlock_table and all([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
+			if state_hash in self.environment.deadlock_table and all(
+					[self.environment.deadlock_table[state_hash][key] for key in
+					 self.environment.deadlock_table[state_hash]]):
 				continue
 
 			if sokoban_map[tuple(state[0] + action)] != environment.WALL:
@@ -111,21 +108,18 @@ class QAgent(Agent):
 
 		return viable_actions
 
-
-
 	def next_state(self, state, action, sokoban_map):
 		map_location = sokoban_map[tuple(state[0] + action)]
 		if map_location == environment.WALL:
 			next_state = state
-		elif map_location == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] != environment.EMPTY:
+		elif map_location == environment.BOX and sokoban_map[tuple(state[0] + 2 * action)] != environment.EMPTY:
 			next_state = state
 		elif map_location == environment.BOX:
 			next_state = np.copy(state)
 
-			
 			for i in range(len(next_state[1:])):
-				if (next_state[i+1] == state[0]+action).all():
-					next_state[i+1] = state[0] + 2*action 
+				if (next_state[i + 1] == state[0] + action).all():
+					next_state[i + 1] = state[0] + 2 * action
 			next_state[0] = state[0] + action
 		else:
 			next_state = np.copy(state)
@@ -134,7 +128,7 @@ class QAgent(Agent):
 		return next_state
 
 	def update(self, state, action, sokoban_map):
-		#print(self.encode(state, action))
+		# print(self.encode(state, action))
 		if self.encode(state, action) not in self.qtable:
 			self.qtable[self.encode(state, action)] = 0.
 
@@ -145,31 +139,35 @@ class QAgent(Agent):
 			if self.encode(next_state, possible_action) not in self.qtable:
 				self.qtable[self.encode(next_state, possible_action)] = 0.
 
-		qmax = np.amax(np.array([self.qtable[self.encode(next_state, possible_action)] for possible_action in next_actions]))
-		self.qtable[self.encode(state, action)] += self.learning_rate*(self.reward(state, action, sokoban_map) + self.discount_factor*qmax - self.qtable[self.encode(state, action)])
+		qmax = np.amax(
+			np.array([self.qtable[self.encode(next_state, possible_action)] for possible_action in next_actions]))
+		self.qtable[self.encode(state, action)] += self.learning_rate * (
+				self.reward(state, action, sokoban_map) + self.discount_factor * qmax - self.qtable[
+			self.encode(state, action)])
 
-		#print(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
-
+	# print(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
 
 	def learn(self, state, sokoban_map):
-		#exploration
-		if random.random() < 0.99: #greedy rate
+		# exploration
+		if random.random() < 0.99:  # greedy rate
 			chosen_action = random.choice(self.get_actions(state, sokoban_map))
 		else:
 			chosen_action = self.evaluate(state, sokoban_map)
 		self.update(state, chosen_action, sokoban_map)
 		return chosen_action
-		
+
 	def evaluate(self, state, sokoban_map):
 		chosen_action = None
 		chosen_value = 0.
 		for possible_action in self.get_actions(state, sokoban_map):
 
 			if self.verbose:
-				print(f"{environment.direction_to_str(possible_action)}:{self.qtable[self.encode(state, possible_action)]}")
-			
+				print(
+					f"{environment.direction_to_str(possible_action)}:{self.qtable[self.encode(state, possible_action)]}")
+
 			if self.encode(state, possible_action) not in self.qtable:
-				self.qtable[self.encode(state, possible_action)] = 0. #represents an unseen state... not ideal while evaluating
+				self.qtable[self.encode(state,
+										possible_action)] = 0.  # represents an unseen state... not ideal while evaluating
 
 			# print(possible_action)
 			# print(self.qtable[self.encode(state, possible_action)])
@@ -180,11 +178,11 @@ class QAgent(Agent):
 			else:
 				potential_value = self.qtable[self.encode(state, possible_action)]
 				if chosen_value < potential_value:
-					#keep this one
+					# keep this one
 					chosen_action = possible_action
 					chosen_value = potential_value
 
-		#print(f"chosen action:{chosen_action}")
+		# print(f"chosen action:{chosen_action}")
 		return chosen_action
 
 	def replay(self):
@@ -200,11 +198,9 @@ class QAgent(Agent):
 			# 	action = random.choice(self.actions)
 			self.environment.step(action)
 
-
-
 	def episode(self, draw=False, evaluate=False, max_iterations=1500):
 		action_sequence = []
-	
+
 		self.environment.reset()
 
 		num_iterations = 0
@@ -229,22 +225,147 @@ class QAgent(Agent):
 
 				pstate_2 = np.copy(pstate_1)
 				pstate_1 = np.copy(self.environment.state)
-				
-
-
 
 			action_sequence.append(action)
 			num_iterations += 1
 
-
 		if self.environment.is_goal():
 			self.experience_cache.append(action_sequence)
 
-			if len(self.experience_cache) > 5: #limit to 5 experiences
+			if len(self.experience_cache) > 5:  # limit to 5 experiences
 				self.experience_cache.pop(0)
 
 		if not evaluate and self.experience_cache and random.random() < self.replay_rate:
 			self.replay()
 
-
 		return self.environment.is_goal(), num_iterations
+
+
+class DeepQAgent(Agent):
+	def __init__(self, environment, discount_factor=.95, target_update_freq=100, batch_size=32,
+				 max_explore=1,
+				 min_explore=0.05,
+				 anneal_rate=(1 / 200),
+				 replay_memory_size=100, *args, **kwargs):
+		super().__init__(environment, *args, **kwargs)
+
+		state_size = np.size(self.environment.state, axis=0)
+
+		self.online_network = Network(state_size, len(self.actions))
+		self.target_network = Network(state_size, len(self.actions))
+
+		self.update_target_network()
+
+		self.batch_size = batch_size
+		self.replay_memory_size = replay_memory_size
+		self.target_update_frequent = target_update_freq
+		self.steps = 0
+		self.discount_factor = discount_factor
+		self.max_explore = max_explore
+		self.min_explore = min_explore
+		self.anneal_rate = anneal_rate
+
+		self.replay_buffer = ReplayBuffer(replay_memory_size)
+
+	def policy(self, state, training):
+		explore_prob = self.max_explore - (self.steps * self.anneal_rate)
+		explore = max(explore_prob, self.min_explore) > np.random.rand()
+		if training and explore:
+			action_idx = np.random.randint(len(self.actions))
+		else:
+			inputs = np.array([self.encode_state(state)])
+			qvalues = self.online_network.predict(inputs)
+			action_idx = np.argmax(qvalues, axis=-1)[0]
+
+		return self.actions[action_idx]
+
+	def reward(self, state, action, sokoban_map):
+		box_pushing = sokoban_map[tuple(state[0] + action)] == environment.BOX and sokoban_map[
+			tuple(state[0] + 2 * action)] == environment.EMPTY
+		push_on_goal = box_pushing and (tuple(state[0] + 2 * action) in self.environment.storage)
+
+		if push_on_goal:
+			goal_reach = True
+			set_difference = self.environment.storage.difference({tuple(state[0] + 2 * action)})
+			for place in set_difference:
+				if sokoban_map[place] != environment.BOX:
+					goal_reach = False
+		else:
+			goal_reach = False
+
+		if goal_reach:
+			# print("reward for finishing puzzle")
+			return 500.
+		elif push_on_goal:
+			return 50.
+		elif box_pushing:
+			return -0.5
+		elif self.environment.is_deadlock():
+			# print("deadlock reward")
+			return -2.
+		else:
+			return -1.
+
+	def episode(self, draw=False, evaluate=False, max_iterations=1500):
+		self.environment.reset()
+		self.last_state, self.last_action = None, None
+		num_iteration = 0
+		while not self.environment.is_goal() and not self.environment.is_deadlock() and num_iteration < max_iterations:
+			self.steps += 1
+			last_state, last_action = self.last_state, self.last_action
+			state = np.copy(self.environment.state)
+			action = self.policy(self.environment.state, not evaluate)
+			self.environment.step(action)
+			if draw:
+				self.environment.draw()
+
+			if not evaluate:
+				if last_state is not None:
+					action_idx = 0
+					for i, a in enumerate(self.actions):
+						if np.array_equal(a, last_action):
+							action_idx = i
+					reward = self.reward(last_state, last_action, self.environment.map)
+					self.replay_buffer.add({
+						'action': action_idx,
+						'state': self.encode_state(last_state),
+						'reward': reward,
+						'next_state': self.encode_state(state),
+					})
+				if self.steps > self.replay_memory_size:
+					self.train_network()
+				if self.steps % self.target_update_frequent == 0:
+					self.update_target_network()
+			self.last_state = state
+			self.last_action = action
+
+			num_iteration += 1
+		print("Agent: stop -- goal: %s / dead: %s / steps: %s" % (
+			self.environment.is_goal(), self.environment.is_deadlock(), num_iteration))
+		return self.environment.is_goal(), self.steps
+
+	def encode_state(self, state):
+		return np.sum((state + [0, -1]) * [1, self.environment.xlim], axis=1)
+
+	def decode_state(self, arr):
+		return np.array([
+			((arr - 1) / self.environment.xlim + 1).astype(int),
+			(arr - 1) % self.environment.xlim + 1
+		]).reshape((-1, 2), order='F')
+
+	def train_network(self):
+		batch = self.replay_buffer.sample(self.batch_size)
+		inputs = np.array([b["state"] for b in batch])
+		actions = np.array([b["action"] for b in batch])
+		rewards = np.array([b["reward"] for b in batch])
+		next_inputs = np.array([b["next_state"] for b in batch])
+		actions_one_hot = np.eye(len(self.actions))[actions]
+
+		next_qvalues = self.target_network.predict(next_inputs)
+		targets = rewards + self.discount_factor * tf.reduce_max(next_qvalues, axis=1)
+
+		self.online_network.train_step(inputs, targets, actions_one_hot)
+
+	def update_target_network(self):
+		w, b = self.online_network.get_variable()
+		self.target_network.set_variables(w, b)
