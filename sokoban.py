@@ -50,7 +50,7 @@ def train():
     # import matplotlib.patches as patches 
 
     max_episodes = abs(args.episodes)
-    max_iteraitons = abs(args.iterations)
+    max_iterations = abs(args.iterations)
 
     if len(args.command) < 2:
         raise Exception("Expected filepath input.")
@@ -80,7 +80,7 @@ def train():
 
         if num_episodes % 1 == 0:
             print(f"{num_episodes:5d}.{0:7d}:")
-        goal, iterations = agent.episode(draw = args.draw, evaluate=False, iterations=max_iterations)
+        goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
         if goal:
             goals_reached += 1

@@ -93,7 +93,7 @@ class DeepQAgent(Agent):
         self.model = SokobanNet(self.environment.xlim, self.environment.ylim)
         if torch.cuda.is_available():
             self.model.cuda()
-            self.cuda_device = self.device('cuda')
+            self.cuda_device = torch.device('cuda')
         else:
             self.cuda_device = None
 
