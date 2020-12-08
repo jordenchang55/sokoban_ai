@@ -50,6 +50,7 @@ def train():
     # import matplotlib.patches as patches 
 
     max_episodes = abs(args.episodes)
+    max_iteraitons = abs(args.iterations)
 
     if len(args.command) < 2:
         raise Exception("Expected filepath input.")
@@ -77,19 +78,20 @@ def train():
         # if num_episodes % 500 == 0 and num_episodes > 0: 
         #   iterative_threshold = iterative_threshold*2
 
-        goal, iterations = agent.episode(draw = args.draw)
+        if num_episodes % 1 == 0:
+            print(f"{num_episodes:5d}.{0:7d}:")
+        goal, iterations = agent.episode(draw = args.draw, evaluate=False, iterations=max_iterations)
 
         if goal:
             goals_reached += 1
             episode_bookmarks.append(num_episodes)
             episode_iterations.append(iterations)
             #print(f"{num_episodes:5d}:goal reached.")
-        if num_episodes % 1 == 0:
-            print(f"{num_episodes:5d}:")
+        
 
 
         if num_episodes > 0 and num_episodes % 100 == 0:
-            goal, iterations = agent.episode(draw = False, evaluate=True)
+            goal, iterations = agent.episode(draw = False, evaluate=True, iterations=200)
             print("-"*20)
             print(f"evaluation:{goal}")
             if goal:
@@ -193,7 +195,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Solve a Sokoban game using artificial intelligence.")
     parser.add_argument('--quiet', '-q', action='store_true')
     parser.add_argument('--verbose', '-v', action='store_true')
-    parser.add_argument('--episodes', '-e', action='store', type=int, default=5000)
+    parser.add_argument('--episodes', action='store', type=int, default=500)
+    parser.add_argument('--iterations', action='store', type=int, default=5000)
+
+    parser.add_argument('--output', '-o', type=str)
     parser.add_argument('--save_figure', '-s', action='store_true')
     parser.add_argument('--draw', '-d', action='store_true')
     parser.add_argument('--sequence', type=str)

@@ -5,6 +5,7 @@ from agent import Agent
 import numpy as np
 from collections import deque
 import random
+import csv
 
 from pathlib import Path
 class SokobanNet(nn.Module):
@@ -15,7 +16,7 @@ class SokobanNet(nn.Module):
         self.dropout = dropout
 
         channels = 4
-        self.conv1 = nn.Conv2d(2, channels, kernel_size = 3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(4, channels, kernel_size = 3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
         self.conv4 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
@@ -25,7 +26,7 @@ class SokobanNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(channels)
         self.bn4 = nn.BatchNorm2d(channels)
 
-        self.fc1 = nn.Linear(4*(xlim+1)*(ylim+1), 1024)
+        self.fc1 = nn.Linear(4*(26*26), 1024)
         self.fc_bn1 = nn.BatchNorm1d(1024)
 
         self.fc2 = nn.Linear(1024, 512)
@@ -41,7 +42,7 @@ class SokobanNet(nn.Module):
         s = funct.relu(self.bn2(self.conv2(s)))
         s = funct.relu(self.bn3(self.conv3(s)))
         s = funct.relu(self.bn4(self.conv4(s)))
-        s = s.view(-1, 4*(self.xlim+1)*(self.ylim+1))
+        s = s.view(-1, 4*(26*26))
 
         s = funct.dropout(funct.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
         s = funct.dropout(funct.relu(self.fc_bn2(self.fc2(s))), p=self.dropout, training=self.training)  # batch_size x 512
@@ -74,21 +75,34 @@ class DeepQAgent(Agent):
 
 
 
-    def __init__(self, environment, discount_factor=0.95, minibatch_size = 32, verbose=False):
+    def __init__(self, environment, discount_factor=0.95, greedy_rate=0.8, minibatch_size = 64, verbose=False):
         super().__init__(environment)
 
         self.discount_factor = discount_factor
         self.minibatch_size = minibatch_size
+        self.greedy_rate = greedy_rate
+        self.verbose = verbose
+
+        if self.environment.xlim > 25 or self.environment.ylim > 25:
+            raise ValueError("Map size too large for current DeepQAgent implementation.")
+        else:
+            self.pad_config = [(0, 26-(self.environment.xlim+1)), (0, 26-(self.environment.ylim+1))]
+
 
         #if torch.cuda.is_available():
         self.model = SokobanNet(self.environment.xlim, self.environment.ylim)
         if torch.cuda.is_available():
             self.model.cuda()
+            self.cuda_device = self.device('cuda')
+        else:
+            self.cuda_device = None
 
         self.criterion = nn.MSELoss(reduction='sum')
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6)
 
         self.replay_buffer = ReplayBuffer(buffer_size = 500)
+
+        self.action_sequence = None
 
 
     def reward(self, state, action):
@@ -150,8 +164,39 @@ class DeepQAgent(Agent):
                 return index
 
 
+
+
+    def train(self):
+        self.model.train()
+
+        samples = self.replay_buffer.sample(self.minibatch_size)
+        
+
+        batch = np.pad(np.stack(samples, axis=0), [(0,0), (0,0), *self.pad_config])
+
+        tensor_state = torch.from_numpy(batch).view(-1, 4, 26, 26).float()
+        if self.cuda_device:
+            tensor_state = tensor_state.to(device=self.cuda_device)
+        #print(tensor_state.size())
+
+        y_pred = self.model(tensor_state)
+        if self.cuda_device:
+            y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples], device=self.cuda_device)
+        else:
+            y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
+        self.model.train()
+        
+        loss = self.criterion(y_pred, y)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
     def predict(self, state):
-        tensor_state = torch.from_numpy(state).view(1, 2, 9, 9).float()
+        pad_state = np.pad(state, [(0,0), *self.pad_config])
+        tensor_state = torch.from_numpy(pad_state).view(1, 4, 26, 26).float()
+        if self.cuda_device:
+            tensor_state = tensor_state.to(device=self.cuda_device)
         self.model.eval()
         with torch.no_grad():
             return self.model(tensor_state)
@@ -162,42 +207,29 @@ class DeepQAgent(Agent):
         state = np.copy(self.environment.state)
 
         num_iterations = 0
+        self.action_sequence = []
 
         if draw:
             self.environment.draw(state)
         while not self.environment.is_goal_state(state) and not self.environment.is_deadlock(state) and num_iterations < max_iterations:
-            tensor_state = torch.from_numpy(state).view(1, 2, 9, 9).float()
+            #tensor_state = torch.from_numpy(state).view(1, 4, 9, 9).float()
 
             
             if not evaluate:
                 if len(self.replay_buffer) >= self.minibatch_size:
-                    self.model.train()
+                    self.train()
 
-                    samples = self.replay_buffer.sample(self.minibatch_size)
-                    
-                    batch = np.stack(samples, axis=0)
-
-                    tensor_state = torch.from_numpy(batch).view(-1, 2, 9, 9).float()
-                    #print(tensor_state.size())
-
-                    y_pred = self.model(tensor_state)
-                    y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
-                    self.model.train()
-                    
-                    loss = self.criterion(y_pred, y)
-
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
-
-                chosen_action = random.choice(self.actions)
+                if random.random() > self.greedy_rate:
+                    chosen_action = random.choice(self.actions)
+                else:
+                    chosen_action = self.actions[torch.argmax(self.predict(state))]
             else:
                 qvalues = self.predict(state)
                 if self.verbose:
                     print(qvalues)
                 chosen_action = self.actions[torch.argmax(qvalues)]
 
-
+            self.action_sequence.append(chosen_action)
             state = self.environment.next_state(state, chosen_action)
 
             self.replay_buffer.add(np.copy(state))
@@ -206,12 +238,25 @@ class DeepQAgent(Agent):
             if draw:
                 self.environment.draw(state)
 
-            
 
+            if num_iterations > 0 and num_iterations%1000 == 0:
+                print(f"     .{num_iterations:7d}:")
+
+
+            num_iterations += 1
+
+            
+        if num_iterations%1000 != 0:
+            print(f"     .{num_iterations:7d}:")
         goal_flag = self.environment.is_goal_state(state)
 
         return goal_flag, num_iterations
 
+    def save_sequence(self, filename):
+        with open(filename, 'w') as f:
+            writer = csv.writer(f, delimiter=',')
+            for action in self.action_sequence:
+                writer.writerow(action)
 
     def save(self, filename):
         '''
