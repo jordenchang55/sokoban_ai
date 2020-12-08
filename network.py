@@ -29,7 +29,7 @@ class Network:
 	def __init__(self, input_size, output_size, hidden_sizes=None,
 				 weights_initializer=tf.initializers.glorot_uniform(),
 				 bias_initializer=tf.initializers.zeros(),
-				 optimizer=tf.keras.optimizers.Adam):
+				 optimizer=tf.train.AdamOptimizer):
 		if hidden_sizes is None:
 			hidden_sizes = [50, 50]
 		self.input_size = input_size
