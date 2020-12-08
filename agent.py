@@ -89,7 +89,7 @@ class SimpleAgent(Agent):
 class QAgent(Agent):
 
 
-    def __init__(self, environment, learning_rate = 1., discount_factor = 0.95, replay_rate = 0.2, verbose = False,*args, **kwargs):
+    def __init__(self, environment, discount_factor = 0.95, replay_rate = 0.2, verbose = False,*args, **kwargs):
         #super()
         super().__init__(environment, args, kwargs)
         self.qtable = {}

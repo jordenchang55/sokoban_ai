@@ -22,11 +22,11 @@ class EnvironmentTest(unittest.TestCase):
 
     def test_init(self):
 
-        self.assertEquals(self.environment.state[7, 7, 0], 1, msg=f"State does not reflect player's position.")
-        self.assertEquals(self.environment.state.shape, (9, 9, 2))
+        self.assertEquals(self.environment.state[0, 7, 7], 1, msg=f"State does not reflect player's position.")
+        self.assertEquals(self.environment.state.shape, (2, 9, 9))
 
 
-        player = np.unravel_index(np.argmax(self.environment.state[:,:, 0]), self.environment.state[:,:,0].shape)
+        player = self.environment.get_player(self.environment.state)
         self.assertEquals(player, (7, 7), msg=f"{player} not the same as (7,7).")
         
 
@@ -60,9 +60,9 @@ class EnvironmentTest(unittest.TestCase):
 
         next_state = self.environment.next_state(self.environment.state, DOWN)
 
-        self.assertTrue(next_state[7, 6, 0], msg="New position does not contain player.")
-        self.assertFalse(next_state[7, 7, 0], msg="Old position is not empty.")
-        self.assertFalse(next_state[7, 7, 1], msg="Old position is not empty.")
+        self.assertTrue(next_state[0, 7, 6], msg="New position does not contain player.")
+        self.assertFalse(next_state[0, 7, 7], msg="Old position is not empty.")
+        self.assertFalse(next_state[1, 7, 7], msg="Old position is not empty.")
 
     def test_is_goal_state(self):
 
@@ -84,10 +84,10 @@ class EnvironmentTest(unittest.TestCase):
 
         for index, action in enumerate(self.deadlock_sequence):
             current_state = self.environment.next_state(current_state, action)
-            if index < len(self.goal_sequence) - 1:
-                self.assertFalse(self.environment.is_goal_state(current_state), msg="Should not be in deadlock, but is_deadlock() returns true.")
+            if index < len(self.deadlock_sequence) - 1:
+                self.assertFalse(self.environment.is_deadlock(current_state), msg="Should not be in deadlock, but is_deadlock() returns true.")
             else:
-                self.assertTrue(self.environment.is_goal_state(current_state), msg="Should be in deadlock, but is_deadlock() reutrns false.")
+                self.assertTrue(self.environment.is_deadlock(current_state), msg="Should be in deadlock, but is_deadlock() reutrns false.")
 
 
     def tearDown(self):

@@ -46,7 +46,7 @@ def load(filename):
                 player = np.array([int(row[0]), int(row[1])])
 
     return walls, boxes, storage, player, xlim, ylim
-def run():
+def train():
     # import matplotlib.patches as patches 
 
     max_episodes = abs(args.episodes)
@@ -54,10 +54,17 @@ def run():
     if len(args.command) < 2:
         raise Exception("Expected filepath input.")
 
+
+
     walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
 
     environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-    agent = DeepQAgent(environment = environment, learning_rate = 1.0, discount_factor=0.95, verbose=args.verbose)
+    agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
+
+    pretrain_path = Path("sokoban_state.pth")
+    if pretrain_path.exists() and pretrain_path.is_file():
+        agent.load("sokoban_state.pth")
+
 
     episode_bookmarks = []
     episode_iterations = []
@@ -66,11 +73,11 @@ def run():
     num_iterations = 0
     goals_reached = 0
     iterative_threshold = 10000
-    while True:
+    while num_episodes < max_episodes:
         # if num_episodes % 500 == 0 and num_episodes > 0: 
         #   iterative_threshold = iterative_threshold*2
 
-        goal, iterations = agent.episode(draw = args.draw, max_iterations = iterative_threshold)
+        goal, iterations = agent.episode(draw = args.draw)
 
         if goal:
             goals_reached += 1
@@ -82,7 +89,7 @@ def run():
 
 
         if num_episodes > 0 and num_episodes % 100 == 0:
-            goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
+            goal, iterations = agent.episode(draw = False, evaluate=True)
             print("-"*20)
             print(f"evaluation:{goal}")
             if goal:
@@ -91,6 +98,9 @@ def run():
 
 
         num_episodes += 1
+
+    agent.save("sokoban_state.pth")
+
     episode_iterations = np.array(episode_iterations)
 
     goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
@@ -102,7 +112,24 @@ def run():
     print(f"iterations :{iterations}")
 
 
+def evaluate():
+    max_episodes = abs(args.episodes)
 
+    if len(args.command) < 2:
+        raise Exception("Expected filepath input.")
+
+
+
+    walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
+
+    environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+    agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
+
+    pretrain_path = Path("sokoban_state.pth")
+    if pretrain_path.exists() and pretrain_path.is_file():
+        agent.load("sokoban_state.pth")
+
+    agent.episode(draw = True, evaluate=True)
 
 
 def test():
@@ -151,12 +178,16 @@ def draw():
 
 
 def main():
-    if args.command[0] == "run":
-        run()
+    if args.command[0] == "train":
+        train()
     elif args.command[0] == "test":
         test()
     elif args.command[0] == "draw":
         draw()
+    elif args.command[0] == "evaluate":
+        evaluate()
+    else:
+        print("Unrecognized command. Please use sokoban.py --help for help on usage.")
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Solve a Sokoban game using artificial intelligence.")

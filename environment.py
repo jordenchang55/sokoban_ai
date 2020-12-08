@@ -55,7 +55,7 @@ class Environment():
         self.fig = plt.figure()
 
 
-        self.state = np.zeros((xlim+1, ylim+1, 2))#torch.zeros(xlim+1, ylim+1, 2)
+        self.state = np.zeros((2, xlim+1, ylim+1), dtype=np.double)#torch.zeros(xlim+1, ylim+1, 2)
         self.walls = np.zeros((xlim+1, ylim+1)) #torch.zeros(xlim+1, ylim+1)
         self.xlim = xlim
         self.ylim = ylim
@@ -67,9 +67,9 @@ class Environment():
             #print(wall)
             self.walls[wall[0], wall[1]] = 1.
         for box in boxes:
-            self.state[box[0], box[1], 1] = 1.
+            self.state[1, box[0], box[1]] = 1.
 
-        self.state[player[0], player[1], 0] = 1.
+        self.state[0, player[0], player[1]] = 1.
 
         self.deadlock_table = {}
 
@@ -93,13 +93,11 @@ class Environment():
 #             self.state = copy.deepcopy(self.saved_state)
 #             self.has_scored = copy.deepcopy(self.saved_scores)
 
-#     def reset(self):
-#         # print("reset!")
-#         # print(f"player:{self.state[0]}")
-#         # print(f"reset_player:{self.original_player}")
-#         self.map = copy.deepcopy(self.original_map)
-#         self.state = copy.deepcopy(self.original_state)
-#         self.has_scored = np.zeros(len(self.state[2:]))
+    def reset(self):
+        # print("reset!")
+        # print(f"player:{self.state[0]}")
+        # print(f"reset_player:{self.original_player}")
+        self.state = copy.deepcopy(self.original_state)
 
 
 #     def reset_map(self):
@@ -124,21 +122,21 @@ class Environment():
 
     def is_goal_state(self, state):
         for place in self.storage:
-            if state[place[0], place[1], 1] != 1:
+            if state[1, place[0], place[1]] != 1:
                 return False
 
         return True
 
     def get_player(self, state):
-        return np.unravel_index(np.argmax(state[:,:, 0]), state[:,:, 0].shape)
+        return np.unravel_index(np.argmax(state[0, :, :]), state[0, :, :].shape)
     def get_neighbors(self, location):
         return [location + direction for direction in DIRECTIONS]
 
 
     def is_frozen(self, state, location, previous=None):
 
-        # if location.tobytes() in self.deadlock_table[self.boxes_hash]:
-        #   return self.deadlock_table[self.boxes_hash][location.tobytes()]
+        if location.tobytes() in self.deadlock_table[self.state_hash]:
+          return self.deadlock_table[self.state_hash][location.tobytes()]
 
         # if not previous:
         #   previous = set([])
@@ -149,51 +147,51 @@ class Environment():
                 neighbor = tuple(neighbors[i])
                 next_neighbor = tuple(neighbors[(i+1)%len(neighbors)])
 
-                if self.map[neighbor] == WALL and self.map[next_neighbor] == WALL:
-                    self.deadlock_table[self.boxes_hash][location.tobytes()] = True
+                if self.walls[neighbor] == 1 and self.walls[next_neighbor] == 1:
+                    self.deadlock_table[self.state_hash][location.tobytes()] = True
 
                     #print("case 1")
                     return True
-                elif self.map[neighbor] == WALL and self.map[next_neighbor] == BOX:
+                elif self.walls[neighbor] == 1 and state[1, next_neighbor[0], next_neighbor[1]] == 1:
                     #print("case 2")
                     if next_neighbor in previous:
                         #depndency cycle!
-                        self.deadlock_table[self.boxes_hash][location.tobytes()] = True
+                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
-                    if self.is_frozen(np.array(next_neighbor), previous):
-                        self.deadlock_table[self.boxes_hash][location.tobytes()] = True
+                    if self.is_frozen(state, np.array(next_neighbor), previous):
+                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
-                elif self.map[neighbor] == BOX and self.map[next_neighbor] == WALL:
+                elif state[1, neighbor[0], neighbor[1]] == 1 and self.walls[next_neighbor] == 1:
                     #print("case 3")
 
                     if neighbor in previous:
                         #dependency cycle!
-                        self.deadlock_table[self.boxes_hash][location.tobytes()] = True
+                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
 
-                    if self.is_frozen(np.array(neighbor), previous):
-                        self.deadlock_table[self.boxes_hash][location.tobytes()] = True
+                    if self.is_frozen(state, np.array(neighbor), previous):
+                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
-                elif self.map[neighbor] == BOX and self.map[next_neighbor] == BOX:
+                elif state[1, neighbor[0], neighbor[1]] == BOX and state[1, next_neighbor[0], next_neighbor[1]] == BOX:
                     # print("case 4")
                     # print(neighbor in previous)
                     # print(next_neighbor in previous)
                     if neighbor in previous:
                         frozen_neighbor = True
                     else:
-                        frozen_neighbor = self.is_frozen(np.array(neighbor), previous)
+                        frozen_neighbor = self.is_frozen(state, np.array(neighbor), previous)
                     if next_neighbor in previous:
                         frozen_next_neighbor = True
                     else:
-                        frozen_next_neighbor = self.is_frozen(np.array(next_neighbor), previous)
+                        frozen_next_neighbor = self.is_frozen(state, np.array(next_neighbor), previous)
 
 
                     if frozen_neighbor and frozen_next_neighbor:
-                        self.deadlock_table[self.boxes_hash][location.tobytes()] = True
+                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
 
         previous.remove(tuple(location))
-        self.deadlock_table[self.boxes_hash][location.tobytes()] = False
+        self.deadlock_table[self.state_hash][location.tobytes()] = False
 
         return False
 
@@ -205,13 +203,16 @@ class Environment():
 
         if self.state_hash not in self.deadlock_table:
             self.deadlock_table[self.state_hash] = {}
-        for index, box in enumerate():
-            if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
-                return True
-            elif self.is_frozen(box, previous=set([])):
+        for i in range(state.shape[1]):
+            for j in range(state.shape[2]):
+                if state[1, i,j] == 1:
+                    box = np.array([i, j])
+                    if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
+                        return True
+                    elif self.is_frozen(state, box, previous=set([])):
 
-                #self.frozen_nodes = None
-                return True
+                        #self.frozen_nodes = None
+                        return True
 
 
         #self.frozen_nodes = None
@@ -254,15 +255,15 @@ class Environment():
 
         next_state = np.copy(state)
 
-        if state[next_position[0], next_position[1], 1] == 1:
+        if state[1, next_position[0], next_position[1]] == 1:
             next_box_position = next_position + action
 
-            if state[next_box_position[0], next_box_position[1], 1] == 0 and self.walls[tuple(next_box_position)] == 0:
-                next_state[player[0], player[1], 0] = 0
-                next_state[next_position[0], next_position[1], 0] = 1
-                next_state[next_position[0], next_position[1], 1] = 0
+            if state[1, next_box_position[0], next_box_position[1]] == 0 and self.walls[tuple(next_box_position)] == 0:
+                next_state[0, player[0], player[1]] = 0
+                next_state[0, next_position[0], next_position[1]] = 1
+                next_state[1, next_position[0], next_position[1]] = 0
 
-                next_state[next_box_position[0], next_box_position[1], 1] = 1
+                next_state[1, next_box_position[0], next_box_position[1]] = 1
                 
 #                 for i in range(len(self.state[2:])):
 #                     if (self.state[i+2] == next_position).all():
@@ -274,10 +275,10 @@ class Environment():
 
         elif self.walls[next_position[0], next_position[1]] == 1:
             pass
-        elif state[next_position[0], next_position[1], 1] == 0 and self.walls[next_position[0], next_position[1]] == 0:
+        elif state[1, next_position[0], next_position[1]] == 0 and self.walls[next_position[0], next_position[1]] == 0:
             #print("EMPTY")
-            next_state[player[0], player[1], 0] = 0
-            next_state[next_position[0], next_position[1], 0] = 1
+            next_state[0, player[0], player[1]] = 0
+            next_state[0, next_position[0], next_position[1]] = 1
             #return next_position
 
 #         self.state[1,0] = np.sum(self.has_scored)
@@ -321,9 +322,9 @@ class Environment():
                     rect = patches.Rectangle((i+0.5, j+0.5),-1,-1,linewidth=0.5,edgecolor='slategray',facecolor='slategray')
                     ax.add_patch(rect)
 
-                elif state[i,j, 0] == 1:
+                elif state[0, i,j] == 1:
                     plt.plot(i, j, 'o', color='orange')
-                elif state[i,j, 1] == 1:  
+                elif state[1, i,j] == 1:  
                     # if self.is_frozen(state, np.array([i, j]), set([])):
                     #     rect = patches.Rectangle((box[0]+0.5, box[1]+0.5), -1, -1, linewidth=0.5, edgecolor='red', facecolor='red')
                     # else:

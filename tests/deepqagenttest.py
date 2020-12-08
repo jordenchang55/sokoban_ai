@@ -6,15 +6,13 @@ import unittest
 import numpy as np
 import csv
 from environment import Environment
-from environment import DOWN
-from environment import RIGHT
-from environment import LEFT
-from environment import UP
+from environment import DOWN, RIGHT, LEFT, UP, DIRECTIONS
 
 from deepqagent import DeepQAgent
 import copy
 #import logging
 
+from sokoban import load
 
 
 
@@ -25,34 +23,10 @@ class DeepQAgentTest(unittest.TestCase):
 
 
     def setUp(self):
-        with open('inputs/sokoban00.txt', 'r') as file:
-            csv_input = csv.reader(file, delimiter=' ')
+        walls, boxes, storage, player, xlim, ylim = load('inputs/sokoban01.txt')
 
-            for index, row in enumerate(csv_input):
-
-                def unpack(points):
-
-                    return [tuple([int(points[index+1]), int(points[index])]) for index in range(1, len(points), 2)]
-
-                #print(index, row)
-
-                if index == 0:
-                    #sizeH, sizeV
-
-                    xlim = int(row[0])
-                    ylim = int(row[1])
-                if index == 1:
-                    #print(MapType.WALL.value)
-                    walls = unpack(row)
-                elif index == 2:    
-                    boxes = unpack(row)
-                elif index == 3:
-                    storage = unpack(row)
-                elif index == 4:
-                    player = np.array([int(row[0]), int(row[1])])
-
-        environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-        self.agent = DeepQAgent(environment = environment, learning_rate = 1.0, discount_factor=0.95, verbose=False)
+        self.environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+        self.agent = DeepQAgent(environment = self.environment, discount_factor=0.95, verbose=False)
 
 
     def tearDown(self):
@@ -61,6 +35,24 @@ class DeepQAgentTest(unittest.TestCase):
 
 
     def test_reward(self):
-        pass
+        
+        deadlock_sequence = [LEFT, DOWN, LEFT, LEFT, LEFT]
+        goal_sequence = [LEFT, DOWN, LEFT, LEFT, RIGHT, DOWN, RIGHT, DOWN, DOWN, LEFT, LEFT, LEFT, UP, LEFT, DOWN, RIGHT, UP, UP, UP, UP, LEFT, UP, RIGHT]
 
+
+        state = copy.deepcopy(self.environment.state)
+        
+        for direction in DIRECTIONS:
+            self.assertEquals(self.agent.reward(state, direction), -1., msg="Reward for standard movement is incorrect, should be -1.")
+
+        for index, action in goal_sequence:
+            if index == 6 or index == 14:
+                self.assertEquals(self.agent.reward(state, action), 50., msg="Reward for standard movement is incorrect, should be 50.")
+            elif index == len(goal_sequence) - 1:
+                self.assertEquals(self.agent.reward(state, action), 500., msg="Reward for standard movement is incorrect, should be 500.")
+            else:
+                self.assertEquals(self.agent.reward(state, action), -1., msg="Reward for standard movement is incorrect, should be -1.")
+            state = self.environment.next_state(state, action)
+
+        #state = copy.deepcopy(self.environment.state)
 
