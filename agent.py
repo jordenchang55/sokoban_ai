@@ -18,8 +18,12 @@ State = namedtuple('State', ['player', 'boxes'])
 class Agent():
 	actions = [environment.UP, environment.RIGHT, environment.DOWN, environment.LEFT]
 
-	def __init__(self, environment, *args, **kwargs):
+	def __init__(self, environment, seed=None, *args, **kwargs):
 		self.environment = environment
+		if seed:
+			random.seed(seed)
+			np.random.seed(seed)
+			tf.random.set_random_seed(seed)
 
 	def learn(self, state, sokoban_map):
 		return random.choice(self.actions)
@@ -248,8 +252,8 @@ class DeepQAgent(Agent):
 				 max_explore=1,
 				 min_explore=0.05,
 				 anneal_rate=(1 / 200),
-				 replay_memory_size=100, *args, **kwargs):
-		super().__init__(environment, *args, **kwargs)
+				 replay_memory_size=100, seed=None, *args, **kwargs):
+		super().__init__(environment, seed=seed, *args, **kwargs)
 
 		state_size = np.size(self.environment.state, axis=0)
 
@@ -269,8 +273,6 @@ class DeepQAgent(Agent):
 		self.anneal_rate = anneal_rate
 
 		self.replay_buffer = ReplayBuffer(replay_memory_size)
-		random.seed(2)
-		np.random.seed(2)
 
 	def policy(self, state, training):
 		explore_prob = self.max_explore - (self.steps * self.anneal_rate)
@@ -345,6 +347,7 @@ class DeepQAgent(Agent):
 			self.last_action = action
 
 			num_iteration += 1
+		print("steps: %d" % num_iteration)
 		return self.environment.is_goal(), self.steps
 
 	def encode_state(self, state):
