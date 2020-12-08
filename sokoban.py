@@ -131,7 +131,8 @@ def evaluate():
     if pretrain_path.exists() and pretrain_path.is_file():
         agent.load("sokoban_state.pth")
 
-    agent.episode(draw = True, evaluate=True)
+
+    agent.episode(draw = False, evaluate=True)
 
 
 def test():
@@ -177,6 +178,49 @@ def draw():
     #if args.sequence:
 
 
+def time():
+    max_episodes = abs(args.episodes)
+
+
+    if len(args.command) < 3:
+        raise Exception("Expected 'time <input file> <output file>' format.")
+
+
+
+    walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
+
+    environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+    agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
+
+
+    for i in range(100):
+        print(f"{i:5d}.{0:7d}:")
+        agent.episode(draw = False, evaluate=False)
+
+
+    data = zip(range(100), gent.episode_times, agent.training_times)
+
+    with open(args.command[2], 'a') as file:
+        writer = csv.writer(file, delimiter=',')
+        for datum in data:
+            writer.writerow(datum)
+
+
+def plot():
+    data = []
+
+    if len(args.command) < 2:
+        raise Exception("Expected 'plot <csv file>' format.")
+
+    with open(args.command[0], 'r') as file:
+        reader = csv.reader(file, delimiter=',')
+        for row in reader:
+            data.append([int(row[0]), eval(row[1]), eval(row[2])])
+
+    data = zip(*data)
+
+    print(data)
+
 
 
 def main():
@@ -188,6 +232,8 @@ def main():
         draw()
     elif args.command[0] == "evaluate":
         evaluate()
+    elif args.command[0] == "time":
+        time()
     else:
         print("Unrecognized command. Please use sokoban.py --help for help on usage.")
     
