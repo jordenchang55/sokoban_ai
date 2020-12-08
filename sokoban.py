@@ -104,6 +104,7 @@ def train():
     episode_iterations = np.array(episode_iterations)
 
     goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
+    agent.save_sequence("action_sequence.csv")
 
     print("-"*30)
     print("Simulation ended.")
