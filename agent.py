@@ -4,43 +4,84 @@ import random
 import numpy as np
 
 import environment
-from environment import MapType
+import copy
+#from environment import MapType
 
 
 from collections import namedtuple
 State = namedtuple('State', ['player', 'boxes'])
 
 class Agent():
-	actions = [environment.UP, environment.RIGHT, environment.DOWN, environment.LEFT]
+    actions = [environment.UP, environment.RIGHT, environment.DOWN, environment.LEFT]
 
-	def __init__(self, environment, *args, **kwargs):
-		self.environment = environment
-
-
-	def learn(self, state, sokoban_map):
-
-		return random.choice(self.actions)
+    def __init__(self, environment, *args, **kwargs):
+        self.environment = environment
 
 
-	def evaluate(self, state, sokoban_map):
-		return random.choice(self.actions)
+    def learn(self, state, sokoban_map):
+
+        return random.choice(self.actions)
+
+
+    def evaluate(self, state, sokoban_map):
+        return random.choice(self.actions)
 
 
 
 
 class SimpleAgent(Agent):
 
-	def __init__(self, *args, **kwargs):
-		pass
+    def __init__(self, *args, **kwargs):
+        pass
 
-	def heuristic(self, state, sokoban_map):
-		pass
-
-
-	def get_action(self, state, sokoban_map):
+    def heuristic(self, state, sokoban_map):
+        pass
 
 
-		pass	
+    def get_action(self, state, sokoban_map):
+
+
+        pass    
+
+
+# class SpeedyQAgent(Agent):
+
+#   def __init__(self, environment, learning_rate = 1., discount_factor=09.5, replay_rate=0.2, verbose=False, *args, **kwargs):
+#       super().__init__(environment, args, kwargs)
+
+#       self.qtable = {}
+
+#       self.experience_cache = []
+#       self.learning_rate = learning_rate
+#       self.discount_factor = discount_factor
+#       self.replay_rate = replay_rate
+#       self.verbose = verbose
+
+#       self.inspiration = []
+
+
+
+
+
+#   def learn(self, state, sokoban_map):
+
+
+#       if state not in qtable:
+#           qtable[state] = np.zeros((self.environment.xlim, self.environment.ylim, len(self.actions)))
+
+
+#       qmax = [[ for j in range(self.environment.ylim)] for i in range(self.environment.xlim)]
+#       qtable[state] = self.learning_rate*(self.reward(state, action, sokoban_map) + self.discount_factor*qmax - self.qtable[self.encode(state, action)])
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -48,157 +89,305 @@ class SimpleAgent(Agent):
 class QAgent(Agent):
 
 
-	def __init__(self, environment, *args, **kwargs):
-		#super()
-		super().__init__(environment, args, kwargs)
-		self.qtable = {}
+    def __init__(self, environment, discount_factor = 0.95, replay_rate = 0.2, verbose = False,*args, **kwargs):
+        #super()
+        super().__init__(environment, args, kwargs)
+        self.qtable = {}
 
-		self.experience_cache = []
-		self.learning_rate = kwargs['learning_rate']
-		self.discount_factor = kwargs['discount_factor']
-		self.replay_rate = kwargs['replay_rate']
+        self.experience_cache = []
+        self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
+        self.replay_rate = replay_rate
+        self.verbose = verbose
 
-	def encode(self, state, action):
-		return str((state,action))
+        self.inspiration = []
 
+        self.tree = set([])
 
-	def reward(self, state, action, sokoban_map):
-		box_pushing = sokoban_map[tuple(state.player + action)] == MapType.BOX.value and sokoban_map[tuple(state.player + 2*action)] == MapType.EMPTY.value
-		push_on_goal = box_pushing and (tuple(state.player+2*action) in self.environment.storage)
+    def encode(self, state, action):
+        return (state.tobytes(), action.tobytes())
 
-		# goal_reach = all([sokoban_map[place] == MapType.BOX.value for place in self.environment.storage])
-		if push_on_goal:
-			goal_reach = True
-			set_difference = self.environment.storage.difference({tuple(state.player + 2 * action)})
-			for place in set_difference:
-				if sokoban_map[place] != MapType.BOX.value:
-					goal_reach = False
-		else:
-			goal_reach = False
+    def count_box_on_goal(self):
+        count = 0
+        for box in self.environment.state[2:]:
+            if tuple(box) in self.environment.storage:
+                count += 1
 
-		if goal_reach:
-			#print("reward for finishing puzzle")
-			return 500.
-		elif push_on_goal:
-			return 50.
-		else:
-			return -1
+        return count
+    def reward(self, state, action, sokoban_map):
+        box_position = tuple(state[0] + action)
+        box_pushing = sokoban_map[box_position] == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] == environment.EMPTY
+        push_on_goal = box_pushing and (tuple(state[0]+2*action) in self.environment.storage)
 
-
-	def next_state(self, state, action, sokoban_map):
-		map_location = sokoban_map[tuple(state.player + action)]
-		if map_location == MapType.WALL.value:
-			next_state = state
-		elif map_location == MapType.BOX.value and sokoban_map[tuple(state.player + 2*action)] != MapType.EMPTY.value:
-			next_state = state
-		elif map_location == MapType.BOX.value:
-			boxes = state.boxes[:]
-			for i in range(len(boxes)):
-				if (boxes[i] == state.player+action).all():
-					boxes[i] = state.player + 2*action 
-			next_state = State(player = state.player + action, boxes = boxes)
-		else:
-			next_state = State(player = state.player + action, boxes = state.boxes)
-
-		return next_state
-
-	def update(self, state, action, sokoban_map):
-		#print(self.encode(state, action))
-		if self.encode(state, action) not in self.qtable:
-			self.qtable[self.encode(state, action)] = 0.
-
-		next_state = self.next_state(state, action, sokoban_map)
-
-		for possible_actions in self.actions:
-			if self.encode(next_state, possible_actions) not in self.qtable:
-				self.qtable[self.encode(next_state, possible_actions)] = 0.
-
-		qmax = np.amax(np.array([self.qtable[self.encode(next_state, possible_actions)] for possible_actions in self.actions]))
-		self.qtable[self.encode(state, action)] += self.learning_rate*(self.reward(state, action, sokoban_map) + self.discount_factor*qmax - self.qtable[self.encode(state, action)])
-
-		#print(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
-
-
-	def learn(self, state, sokoban_map):
-		#exploration
-		if random.random() < 1.:
-			chosen_action = random.choice(self.actions)
-		else:
-			chosen_action = self.evaluate(state, sokoban_map)
-		self.update(state, chosen_action, sokoban_map)
-		return chosen_action
-		
-	def evaluate(self, state, sokoban_map):
-		chosen_action = None
-		chosen_value = 0.
-		for possible_action in self.actions:
-
-			
-			if self.encode(state, possible_action) not in self.qtable:
-				self.qtable[self.encode(state, possible_action)] = 0. #represents an unseen state... not ideal while evaluating
-
-			# print(possible_action)
-			# print(self.qtable[self.encode(state, possible_action)])
-
-			if chosen_action is None:
-				chosen_action = possible_action
-				chosen_value = self.qtable[self.encode(state, possible_action)]
-			else:
-				potential_value = self.qtable[self.encode(state, possible_action)]
-				if chosen_value < potential_value:
-					#keep this one
-					chosen_action = possible_action
-					chosen_value = potential_value
-
-		#print(f"chosen action:{chosen_action}")
-		return chosen_action
-
-	def replay(self):
-		# choose experience from experience cache
-
-		experience = random.choice(self.experience_cache)
-		self.environment.reset()
-		for action in experience:
-			self.update(State(player=self.environment.player, boxes=self.environment.boxes), action, self.environment.map)
-			# if random.random() < 0.05:
-			# 	action = self.learn(State(player=self.environment.player, boxes=self.environment.boxes), self.environment.map)
-			# else:
-			# 	action = random.choice(self.actions)
-			self.environment.step(action)
+        not_scored = False
+        for i in range(len(self.environment.state[2:])):
+            if (box_position == self.environment.state[2+i]).all():
+                not_scored = not self.environment.has_scored[i]
 
 
 
-	def episode(self, draw=False, evaluate=False, max_iterations=1500):
-		action_sequence = []
-	
-		self.environment.reset()
+        goal_reach = all([sokoban_map[place] == environment.BOX for place in self.environment.storage])
+        if push_on_goal:
+            goal_reach = True
+            set_difference = self.environment.storage.difference({tuple(state[0] + 2 * action)})
+            for place in set_difference:
+                if sokoban_map[place] != environment.BOX:
+                    goal_reach = False
+        else:
+            goal_reach = False
 
-		num_iterations = 0
-		while not self.environment.is_goal() and not self.environment.is_deadlock():
-			if not evaluate:
-				action = self.learn(State(player=self.environment.player, boxes=self.environment.boxes), self.environment.map)
-			else:
-				action = self.evaluate(State(player=self.environment.player, boxes=self.environment.boxes), self.environment.map)
-			self.environment.step(action)
+        boxes_hash = self.next_state(state, action, sokoban_map)[2:].tobytes()
+        if goal_reach:
+            #print("reward for finishing puzzle")
+            return 500.
+        elif push_on_goal and not_scored:
+            #next_state = self.next_state(state, action, sokoban_map)
+            self.inspiration.append((copy.deepcopy(state), copy.deepcopy(self.environment.has_scored)))
+            if len(self.inspiration) > 10: 
+                self.inspiration.pop(0)
+            return 50. 
+        elif boxes_hash in self.environment.deadlock_table and any([self.environment.deadlock_table[boxes_hash][key] for key in self.environment.deadlock_table[boxes_hash]]):
+            #print('deadlock reward')
+            return -5.
+        # elif box_pushing:
+        #   return -0.5
+        # elif self.environment.is_deadlock():
+        #   #print("deadlock reward")
+        #   return -2
+        else:
+            return -1.
 
-			if draw:
-				self.environment.draw()
+    def get_actions(self, state, sokoban_map):
+        '''
+        Gets "viable" actions for the robot. i.e. one's that don't move into walls or deadlocks
+        '''
+        viable_actions = []
+        for action in self.actions:
+            next_state = self.next_state(state, action, sokoban_map)
+            next_boxes_hash = next_state[2:].tobytes()
+            # if next_boxes_hash in self.environment.deadlock_table and any([self.environment.deadlock_table[next_boxes_hash][key] for key in self.environment.deadlock_table[next_boxes_hash]]):
+            #   continue
 
-			if num_iterations > max_iterations:
-				break
+            if sokoban_map[tuple(state[0] + action)] != environment.WALL:
+                viable_actions.append(action)
 
-			action_sequence.append(action)
-			num_iterations += 1
-
-
-		if self.environment.is_goal():
-			self.experience_cache.append(action_sequence)
-
-			if len(self.experience_cache) > 5: #limit to 5 experiences
-				self.experience_cache.pop(0)
-
-		if self.experience_cache and random.random() < self.replay_rate:
-			self.replay()
+        return viable_actions
 
 
-		return self.environment.is_goal(), num_iterations
+
+    def next_state(self, state, action, sokoban_map):
+        map_location = sokoban_map[tuple(state[0] + action)]
+        if map_location == environment.WALL:
+            next_state = state
+        elif map_location == environment.BOX and sokoban_map[tuple(state[0] + 2*action)] != environment.EMPTY:
+            next_state = state
+        elif map_location == environment.BOX:
+            next_state = np.copy(state)
+
+            
+            for i in range(len(next_state[2:])):
+                if (next_state[i+2] == state[0]+action).all():
+                    next_state[i+2] = state[0] + 2*action 
+
+                    if self.environment.has_scored[i] == 0 and tuple(next_state[i+2]) in self.environment.storage:
+                        #if agent hasn't scored this box but is about to score the box
+                        next_state[1,0] += 1
+                    break
+            next_state[0] = state[0] + action
+        else:
+            next_state = np.copy(state)
+            next_state[0] = state[0] + action
+
+        #print(next_state)
+        return next_state
+
+    def update(self, state, action, sokoban_map):
+        #print(self.encode(state, action))
+        if self.encode(state, action) not in self.qtable:
+            self.qtable[self.encode(state, action)] = 0.
+
+        next_state = self.next_state(state, action, sokoban_map)
+
+        next_actions = self.get_actions(next_state, sokoban_map)
+        for possible_action in next_actions:
+            if self.encode(next_state, possible_action) not in self.qtable:
+                self.qtable[self.encode(next_state, possible_action)] = 0.
+
+        if next_actions:
+            qmax = np.amax(np.array([self.qtable[self.encode(next_state, possible_action)] for possible_action in next_actions]))
+        else:
+            qmax = -1.
+        self.qtable[self.encode(state, action)] += self.learning_rate*(self.reward(state, action, sokoban_map) + self.discount_factor*qmax - self.qtable[self.encode(state, action)])
+
+        #print(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
+
+
+    def learn(self, state, sokoban_map):
+        #exploration
+        if random.random() < 0.2    : #greedy rate
+            possible_actions = self.get_actions(state, sokoban_map)
+            # have_seen = [self.encode(state, possible_action) in self.qtable for possible_action in possible_actions]
+            # if all(have_seen):
+            chosen_action = random.choice(self.get_actions(state, sokoban_map))
+            # else:
+            #   chosen_action = possible_actions[0]
+            #   for index, seen_action in enumerate(have_seen):
+            #       if not seen_action:
+            #           chosen_action = possible_actions[index]
+
+        else:
+            chosen_action = self.evaluate(state, sokoban_map)
+        self.update(state, chosen_action, sokoban_map)
+        return chosen_action
+        
+    def evaluate(self, state, sokoban_map):
+        chosen_action = None
+        chosen_value = 0.
+        for possible_action in self.get_actions(state, sokoban_map):
+
+            if self.verbose:
+                print(f"{environment.direction_to_str(possible_action)}:{self.qtable[self.encode(state, possible_action)]}")
+            
+            if self.encode(state, possible_action) not in self.qtable:
+                self.qtable[self.encode(state, possible_action)] = 0. #represents an unseen state... not ideal while evaluating
+
+            # print(possible_action)
+            # print(self.qtable[self.encode(state, possible_action)])   
+
+            if chosen_action is None:
+                chosen_action = possible_action
+                chosen_value = self.qtable[self.encode(state, possible_action)]
+            else:
+                potential_value = self.qtable[self.encode(state, possible_action)]
+                if chosen_value < potential_value:
+                    #keep this one
+                    chosen_action = possible_action
+                    chosen_value = potential_value
+
+        #print(f"chosen action:{chosen_action}")
+        return chosen_action
+
+    def replay(self):
+        # choose experience from experience cache
+
+        experience = random.choice(self.experience_cache)
+        self.environment.reset()
+        for action in experience:
+            self.update(self.environment.state, action, self.environment.map)
+            # if random.random() < 0.05:
+            #   action = self.learn(State(player=self.environment.player, boxes=self.environment.boxes), self.environment.map)
+            # else:
+            #   action = random.choice(self.actions)
+            self.environment.step(action)
+
+
+    def episode(self, draw=False, evaluate=False, max_iterations = 5000):
+        action_sequence = []
+
+        while not self.environment.is_goal() and not self.environment.is_deadlock():
+            self.environment.reset()
+
+            previous_states = set([])
+            while any([self.next_state(self.environment.state, action, self.environment.map).tobytes() in self.tree for action in self.actions]) and self.environment.state.tobytes() not in previous_states:
+                previous_states.add(self.environment.state.tobytes())
+                action = self.evaluate(self.environment.state, self.environment.map)
+                self.environment.step(action)
+                if draw:
+                    self.environment.draw()
+
+            if draw:
+                self.environment.draw()
+            possible_actions = self.get_actions(self.environment.state, self.environment.map)
+            if possible_actions:
+                for action in possible_actions:
+                    self.tree.add(self.next_state(self.environment.state, action, self.environment.map).tobytes())
+
+            self.environment.save_state()
+
+            for possible_action in possible_actions:
+                self.update(self.environment.state, possible_action, self.environment.map)
+                self.environment.step(possible_action)
+                while not self.environment.is_goal() and not self.environment.is_deadlock():
+                    action = self.learn(self.environment.state, self.environment.map)
+                    self.environment.step(action)
+
+                self.environment.reset_to_save()
+            
+            self.environment.reset_to_save()
+
+            for possible_action in possible_actions:
+                self.update(self.environment.state, possible_action, self.environment.map)
+                #elf.environment.draw()
+
+
+            self.environment.reset()
+            for action in action_sequence:
+                self.update(self.environment.state, possible_action, self.environment.map)
+
+                self.environment.step(action)
+
+
+
+
+    # def episode(self, draw=False, evaluate=False, max_iterations=10000):
+    #   action_sequence = []
+    
+    #   self.environment.reset()
+
+    #   if not evaluate and self.inspiration and random.random() < 0.1:
+    #       inspired_state, inspired_scores = random.choice(self.inspiration)
+    #       self.environment.state = inspired_state
+    #       self.environment.has_scored = inspired_scores
+    #       self.environment.reset_map()
+
+
+    #       #draw = True
+
+    #   num_iterations = 0
+    #   pstate_1 = None
+    #   pstate_2 = None
+    #   while not self.environment.is_goal() and not self.environment.is_deadlock():
+
+    #       if not evaluate:
+    #           action = self.learn(self.environment.state, self.environment.map)
+    #       else:
+    #           action = self.evaluate(self.environment.state, self.environment.map)
+    #       self.environment.step(action)
+
+    #       if draw:
+    #           self.environment.draw()
+
+    #       if num_iterations > max_iterations:
+    #           break
+
+    #       if evaluate:
+    #           if (pstate_1 == self.environment.state).all() or (pstate_2 == self.environment.state).all():
+    #               break
+
+    #           pstate_2 = np.copy(pstate_1)
+    #           pstate_1 = np.copy(self.environment.state)
+                
+
+
+
+    #       action_sequence.append(action)
+    #       num_iterations += 1
+
+
+    #   if self.environment.is_goal():
+    #       self.experience_cache.append(action_sequence)
+
+    #       if len(self.experience_cache) > 5: #limit to 5 experiences
+    #           self.experience_cache.pop(0)
+
+    #   if not evaluate and self.experience_cache and random.random() < self.replay_rate:
+    #       self.replay()
+
+
+    #   return self.environment.is_goal(), num_iterations
+
+
+
+
+
+
