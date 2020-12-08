@@ -79,6 +79,9 @@ def main():
 
 		if num_episodes > 0 and num_episodes % 1000 == 0:
 			goal, iterations = agent.episode(draw=True, evaluate=True, max_iterations=200)
+			if args.save_network:
+				map_name = args.filename.split("/")[-1].split(".")[0]
+				agent.save("outputs/%s_%d_%s" % (map_name, num_episodes, goal))
 			print("-" * 20)
 			print(f"evaluation:{goal}")
 			if goal:
@@ -104,6 +107,7 @@ if __name__ == '__main__':
 	parser.add_argument('filename')
 	parser.add_argument('--episodes', '-e', action='store', type=int, default=5000)
 	parser.add_argument('--save_figure', '-s', action='store_true')
+	parser.add_argument('--save_network', '-S', action='store_true')
 	parser.add_argument('--draw', '-d', action='store_true')
 	parser.add_argument('--agent', '-a', default='q-learning', choices=['q-learning', 'dqn'])
 	parser.add_argument('--verbose', '-v', action='store_true')

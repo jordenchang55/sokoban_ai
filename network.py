@@ -1,10 +1,9 @@
-import random
+import csv
 from collections import deque
 
 import numpy as np
 import tensorflow as tf
 
-random.seed(2)
 tf.enable_eager_execution()
 
 
@@ -27,53 +26,27 @@ def init_weights(shape, initializer):
 
 class Network:
 	def __init__(self, input_size, output_size, hidden_sizes=None,
-				 weights_initializer=tf.initializers.glorot_uniform(),
-				 bias_initializer=tf.initializers.zeros(),
 				 optimizer=tf.train.AdamOptimizer):
 		if hidden_sizes is None:
 			hidden_sizes = [50, 50]
-		self.input_size = input_size
-		self.output_size = output_size
-		self.hidden_sizes = hidden_sizes
-		self.optimizer = optimizer()
-		self._init_weight(weights_initializer, bias_initializer)
-
-	def _init_weight(self, weights_initializer, bias_initializer):
-		w_shape = []
-		b_shape = []
-		sizes = [self.input_size, *self.hidden_sizes, self.output_size]
-		for i in range(1, len(sizes)):
-			w_shape.append([sizes[i - 1], sizes[i]])
-			b_shape.append([1, sizes[i]])
-		self.weights = [init_weights(s, weights_initializer) for s in w_shape]
-		self.biases = [init_weights(s, bias_initializer) for s in b_shape]
-
-		self.trainable_variables = self.weights + self.biases
-
-	def get_variable(self):
-		return self.weights, self.biases
-
-	def set_variables(self, weights, biases):
-		self.weights = np.copy(weights)
-		self.biases = np.copy(biases)
-		self.trainable_variables = self.weights + self.biases
+		self.model = tf.keras.Sequential()
+		self.model.add(tf.keras.layers.Dense(input_size))
+		for hidden in hidden_sizes:
+			self.model.add(tf.keras.layers.Dense(hidden, activation='relu'))
+		self.model.add(tf.keras.layers.Dense(output_size))
+		self.model.compile(optimizer(learning_rate=0.00001), loss='mse')
 
 	def predict(self, inputs):
-		prev_h = dense(inputs.astype(np.single), self.weights[0], self.biases[0], tf.nn.relu)
-		n = len(self.hidden_sizes)
-		for i in range(1, n):
-			prev_h = dense(prev_h, self.weights[1], self.biases[1], tf.nn.relu)
-
-		out = dense(prev_h, self.weights[n], self.biases[n])
-		return out
+		return self.model.predict(inputs.astype(np.single))
 
 	def train_step(self, inputs, targets, actions_one_hot):
 		with tf.GradientTape() as tape:
-			qvalues = tf.squeeze(self.predict(inputs))
+			qvalues = self.model(inputs.astype(np.single))
 			preds = tf.reduce_sum(qvalues * actions_one_hot, axis=1)
 			loss = tf.keras.losses.MSE(targets, preds)
-			grads = tape.gradient(loss, self.trainable_variables)
-		self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+		grads = tape.gradient(loss, self.model.trainable_variables)
+		self.model.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+		return loss
 
 
 class ReplayBuffer:
@@ -94,3 +67,22 @@ class ReplayBuffer:
 			replace=False
 		)
 		return [self.buffer[i] for i in index]
+
+	def save(self, filepath):
+		with open(filepath, 'w') as f:
+			writer = csv.DictWriter(f, fieldnames=['action', 'state', 'reward', 'next_state'])
+			writer.writeheader()
+			for exp in self.buffer:
+				writer.writerow(exp)
+
+	def load(self, filepath):
+		with open(filepath, 'r') as f:
+			reader = csv.DictReader(f, fieldnames=['action', 'state', 'reward', 'next_state'])
+			for row in reader:
+				exp = {
+					'action': int(row['action']),
+					'reward': float(row['reward']),
+					'state': np.fromstring(row['state'][1:len(row['state']) - 1], dtype=int, sep=" "),
+					'next_state': np.fromstring(row['next_state'][1:len(row['next_state']) - 1], dtype=int, sep=" ")
+				}
+				self.buffer.append(exp)

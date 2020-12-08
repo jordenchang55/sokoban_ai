@@ -1,3 +1,4 @@
+import os
 import random
 from collections import namedtuple
 
@@ -8,9 +9,10 @@ import environment
 from network import Network, ReplayBuffer
 
 # from environment import MapType
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.1)
+sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
 State = namedtuple('State', ['player', 'boxes'])
-random.seed(2)
 
 
 class Agent():
@@ -242,7 +244,7 @@ class QAgent(Agent):
 
 
 class DeepQAgent(Agent):
-	def __init__(self, environment, discount_factor=.95, target_update_freq=100, batch_size=32,
+	def __init__(self, environment, discount_factor=.95, learn_freq=4, target_update_freq=100, batch_size=32,
 				 max_explore=1,
 				 min_explore=0.05,
 				 anneal_rate=(1 / 200),
@@ -257,6 +259,7 @@ class DeepQAgent(Agent):
 		self.update_target_network()
 
 		self.batch_size = batch_size
+		self.learn_frequent = learn_freq
 		self.replay_memory_size = replay_memory_size
 		self.target_update_frequent = target_update_freq
 		self.steps = 0
@@ -266,10 +269,12 @@ class DeepQAgent(Agent):
 		self.anneal_rate = anneal_rate
 
 		self.replay_buffer = ReplayBuffer(replay_memory_size)
+		random.seed(2)
+		np.random.seed(2)
 
 	def policy(self, state, training):
 		explore_prob = self.max_explore - (self.steps * self.anneal_rate)
-		explore = max(explore_prob, self.min_explore) > np.random.rand()
+		explore = explore_prob > np.random.rand()
 		if training and explore:
 			action_idx = np.random.randint(len(self.actions))
 		else:
@@ -332,7 +337,7 @@ class DeepQAgent(Agent):
 						'reward': reward,
 						'next_state': self.encode_state(state),
 					})
-				if self.steps > self.replay_memory_size:
+				if self.steps % self.learn_frequent == 0 and self.steps > self.replay_memory_size:
 					self.train_network()
 				if self.steps % self.target_update_frequent == 0:
 					self.update_target_network()
@@ -340,8 +345,6 @@ class DeepQAgent(Agent):
 			self.last_action = action
 
 			num_iteration += 1
-		print("Agent: stop -- goal: %s / dead: %s / steps: %s" % (
-			self.environment.is_goal(), self.environment.is_deadlock(), num_iteration))
 		return self.environment.is_goal(), self.steps
 
 	def encode_state(self, state):
@@ -364,8 +367,45 @@ class DeepQAgent(Agent):
 		next_qvalues = self.target_network.predict(next_inputs)
 		targets = rewards + self.discount_factor * tf.reduce_max(next_qvalues, axis=1)
 
-		self.online_network.train_step(inputs, targets, actions_one_hot)
+		return self.online_network.train_step(inputs, targets, actions_one_hot)
 
 	def update_target_network(self):
-		w, b = self.online_network.get_variable()
-		self.target_network.set_variables(w, b)
+		self.target_network.model.set_weights(self.online_network.model.get_weights())
+
+	def save(self, folder_name, **kwargs):
+		"""Saves the Agent and all corresponding properties into a folder
+		Arguments:
+			folder_name: Folder in which to save the Agent
+			**kwargs: Agent.save will also save any keyword arguments passed.  This is used for saving the frame_number
+		"""
+
+		# Create the folder for saving the agent
+		if not os.path.isdir(folder_name):
+			os.makedirs(folder_name)
+
+		# Save DQN and target DQN
+		self.online_network.model.save_weights(folder_name + '/dqn.h5')
+		self.target_network.model.save_weights(folder_name + '/target_dqn.h5')
+
+		# Save replay buffer
+		self.replay_buffer.save(folder_name + '/replay-buffer')
+
+	def load(self, folder_name, load_replay_buffer=True):
+		"""Load a previously saved Agent from a folder
+		Arguments:
+			folder_name: Folder from which to load the Agent
+		Returns:
+			All other saved attributes, e.g., frame number
+		"""
+
+		if not os.path.isdir(folder_name):
+			raise ValueError(f'{folder_name} is not a valid directory')
+
+		# Load DQNs
+		self.DQN = tf.keras.models.load_model(folder_name + '/dqn.h5')
+		self.target_dqn = tf.keras.models.load_model(folder_name + '/target_dqn.h5')
+		self.optimizer = self.DQN.optimizer
+
+		# Load replay buffer
+		if load_replay_buffer:
+			self.replay_buffer.load(folder_name + '/replay-buffer')
