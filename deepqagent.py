@@ -6,7 +6,7 @@ import numpy as np
 from collections import deque
 import random
 import csv
-
+import time
 from pathlib import Path
 class SokobanNet(nn.Module):
     def __init__(self, xlim, ylim, dropout=0.5):
@@ -26,13 +26,13 @@ class SokobanNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(channels)
         self.bn4 = nn.BatchNorm2d(channels)
 
-        self.fc1 = nn.Linear(4*(26*26), 1024)
-        self.fc_bn1 = nn.BatchNorm1d(1024)
+        self.fc1 = nn.Linear(4*(26*26), 256)
+        self.fc_bn1 = nn.BatchNorm1d(256)
 
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc_bn2 = nn.BatchNorm1d(512)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc_bn2 = nn.BatchNorm1d(128)
 
-        self.fc4 = nn.Linear(512, 4)
+        self.fc4 = nn.Linear(128, 4)
 
     def forward(self, s):
         #s = s.view()
@@ -75,11 +75,12 @@ class DeepQAgent(Agent):
 
 
 
-    def __init__(self, environment, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 64, verbose=False):
+    def __init__(self, environment, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 64, buffer_size = 10000, verbose=False):
         super().__init__(environment)
 
         self.discount_factor = discount_factor
         self.minibatch_size = minibatch_size
+        self.buffer_size = buffer_size
         self.greedy_rate = greedy_rate
         self.verbose = verbose
 
@@ -100,9 +101,12 @@ class DeepQAgent(Agent):
         self.criterion = nn.MSELoss(reduction='sum')
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6)
 
-        self.replay_buffer = ReplayBuffer(buffer_size = 500)
+        self.replay_buffer = ReplayBuffer(buffer_size = self.buffer_size)
 
         self.action_sequence = None
+
+        self.training_times = []
+        self.episode_times = []
 
 
     def reward(self, state, action):
@@ -167,6 +171,8 @@ class DeepQAgent(Agent):
 
 
     def train(self):
+        training_start = time.process_time()
+
         self.model.train()
 
         samples = self.replay_buffer.sample(self.minibatch_size)
@@ -192,6 +198,8 @@ class DeepQAgent(Agent):
         loss.backward()
         self.optimizer.step()
 
+        self.training_times[-1].append(time.process_time() - training_start)
+
     def predict(self, state):
         pad_state = np.pad(state, [(0,0), *self.pad_config])
         tensor_state = torch.from_numpy(pad_state).view(1, 4, 26, 26).float()
@@ -203,9 +211,10 @@ class DeepQAgent(Agent):
 
 
     def episode(self, draw = False, evaluate = False, max_iterations=5000):
+        episode_start = time.process_time()
 
         state = np.copy(self.environment.state)
-
+        self.training_times.append([])
         num_iterations = 0
         self.action_sequence = []
 
@@ -249,6 +258,8 @@ class DeepQAgent(Agent):
         if num_iterations%1000 != 0:
             print(f"     .{num_iterations:7d}:")
         goal_flag = self.environment.is_goal_state(state)
+
+        self.episode_times.append((num_iterations, time.process_time() - episode_start))
 
         return goal_flag, num_iterations
 
