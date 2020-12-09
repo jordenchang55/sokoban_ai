@@ -34,6 +34,10 @@ Draws a given input. Action sequence replay functionality coming later.
 
 Runs all unit tests for the sokoban source code. 
 
-`python3 sokoban.py run <filename>`
+`python3 sokoban.py train <input_file> <optional_state_dict_path> --episodes e --iterations i`
 
-Runs the agent on the given sokoban input map.
+Trains the AI on the given input file. If you specify an output file, it will save the resulting AI state as that file. Use `--episodes` and `--iterations` to manage number of episodes and max iteration count.
+
+`python3 sokoban.py evaluate <input_file> --draw`
+
+Evaluates the AI given an input file. Probably currently uses the default state dict path, will need to change.
