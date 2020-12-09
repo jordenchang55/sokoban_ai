@@ -75,7 +75,7 @@ class DeepQAgent(Agent):
 
 
 
-    def __init__(self, environment, discount_factor=0.95, greedy_rate=0.8, minibatch_size = 64, verbose=False):
+    def __init__(self, environment, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 64, verbose=False):
         super().__init__(environment)
 
         self.discount_factor = discount_factor
