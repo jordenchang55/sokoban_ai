@@ -75,7 +75,7 @@ class DeepQAgent(Agent):
 
 
 
-    def __init__(self, environment, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 64, buffer_size = 10000, verbose=False):
+    def __init__(self, environment, learning_rate=1e-4, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 128, buffer_size = 10000, verbose=False):
         super().__init__(environment)
 
         self.discount_factor = discount_factor
@@ -98,8 +98,8 @@ class DeepQAgent(Agent):
         else:
             self.cuda_device = None
 
-        self.criterion = nn.MSELoss(reduction='sum')
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6)
+        self.criterion = nn.MSELoss(reduction='sum').cuda() if self.cuda_device else nn.MSELoss(reduction='sum')
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
 
         self.replay_buffer = ReplayBuffer(buffer_size = self.buffer_size)
 
@@ -107,6 +107,8 @@ class DeepQAgent(Agent):
 
         self.training_times = []
         self.episode_times = []
+
+        self.num_episodes = 0
 
 
     def reward(self, state, action):
@@ -212,6 +214,8 @@ class DeepQAgent(Agent):
 
     def episode(self, draw = False, evaluate = False, max_iterations=5000):
         episode_start = time.process_time()
+        self.num_episodes += 1
+        print(f"{self.num_episodes:5d}.{0:7d}:")
 
         state = np.copy(self.environment.state)
         self.training_times.append([])

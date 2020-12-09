@@ -60,26 +60,34 @@ def train():
     walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
 
     environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-    agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
+    agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
 
-    pretrain_path = Path("sokoban_state.pth")
-    if pretrain_path.exists() and pretrain_path.is_file():
-        agent.load("sokoban_state.pth")
+
+    if len(args.command) == 2:
+        pretrain_path = Path("sokoban_state.pth")
+        if pretrain_path.exists() and pretrain_path.is_file():
+            agent.load("sokoban_state.pth")
+        elif pretrain_path.exists() and not pretrain_path.is_file():
+            raise ValueError("Invalid pytorch file.")
+    else:
+        pretrain_path = Path(args.command[2])
+        if pretrain_path.exists() and pretrain_path.is_file():
+            agent.load(args.command[2])
+        elif pretrain_path.exists() and not pretrain_path.is_file():
+            raise ValueError("Invalid file input.")
 
 
     episode_bookmarks = []
     episode_iterations = []
 
-    num_episodes = 0
-    num_iterations = 0
     goals_reached = 0
-    iterative_threshold = 10000
-    while num_episodes < max_episodes:
+    if args.verbose:
+        print(f"{eps:>5s}.{iters:>7s}:")
+
+    while agent.num_episodes < max_episodes:
         # if num_episodes % 500 == 0 and num_episodes > 0: 
         #   iterative_threshold = iterative_threshold*2
 
-        if num_episodes % 1 == 0:
-            print(f"{num_episodes:5d}.{0:7d}:")
         goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
         if goal:
@@ -90,7 +98,7 @@ def train():
         
 
 
-        if num_episodes > 0 and num_episodes % 100 == 0:
+        if agent.num_episodes > 0 and agent.num_episodes % 100 == 0:
             goal, iterations = agent.episode(draw = False, evaluate=True, iterations=200)
             print("-"*20)
             print(f"evaluation:{goal}")
@@ -98,8 +106,13 @@ def train():
                 print(f"iterations:{iterations}")
             print("-"*20)
 
+        #num_episodes += 1
 
-    agent.save("sokoban_state.pth")
+
+    if len(args.command) == 3:
+        agent.save(args.command[2])
+    else:
+        agent.save("sokoban_state.pth")
 
     episode_iterations = np.array(episode_iterations)
 
@@ -107,7 +120,7 @@ def train():
 
     print("-"*30)
     print("Simulation ended.")
-    print(f"episodes   :{num_episodes}")
+    print(f"episodes   :{agent.num_episodes}")
     print(f"map solved :{goal}")
     print(f"iterations :{iterations}")
 
@@ -243,6 +256,9 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--episodes', action='store', type=int, default=500)
     parser.add_argument('--iterations', action='store', type=int, default=5000)
+    parser.add_argument('--learning_rate', action='store', type=float, default=1e-4)
+    parser.add_argument('--buffer_size', action='store', type=int, default=10000)
+    parser.add_argument('--minibatch_size', action='store', type=int, default=128)
 
     parser.add_argument('--output', '-o', type=str)
     parser.add_argument('--save_figure', '-s', action='store_true')
