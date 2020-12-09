@@ -9,8 +9,8 @@ import environment
 from network import Network, ReplayBuffer
 
 # from environment import MapType
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.1)
-sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+# gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.1)
+# sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
 State = namedtuple('State', ['player', 'boxes'])
 
@@ -275,7 +275,7 @@ class DeepQAgent(Agent):
 		self.replay_buffer = ReplayBuffer(replay_memory_size)
 
 	def policy(self, state, training):
-		explore_prob = self.max_explore - (self.steps * self.anneal_rate)
+		explore_prob = max(self.max_explore - (self.steps * self.anneal_rate), self.min_explore)
 		explore = explore_prob > np.random.rand()
 		if training and explore:
 			action_idx = np.random.randint(len(self.actions))
@@ -286,24 +286,20 @@ class DeepQAgent(Agent):
 
 		return self.actions[action_idx]
 
-	def reward(self, state, action, sokoban_map):
+	def reward(self, state, action, sokoban_map: np.ndarray):
 		box_pushing = sokoban_map[tuple(state[0] + action)] == environment.BOX and sokoban_map[
-			tuple(state[0] + 2 * action)] == environment.EMPTY
-		push_on_goal = box_pushing and (tuple(state[0] + 2 * action) in self.environment.storage)
+			tuple(state[0] + 2 * action)] in (environment.EMPTY, environment.GOAL)
+		push_on_goal = box_pushing and sokoban_map[tuple(state[0] + 2 * action)] == environment.GOAL
 
-		if push_on_goal:
-			goal_reach = True
-			set_difference = self.environment.storage.difference({tuple(state[0] + 2 * action)})
-			for place in set_difference:
-				if sokoban_map[place] != environment.BOX:
-					goal_reach = False
-		else:
-			goal_reach = False
+		num_of_boxes = len(state) - 1
+		# push the last box on goal will reach goal
+		goal_reach = push_on_goal and num_of_boxes - 1 == (sokoban_map == environment.BOX_IN_GOAL).sum()
 
 		if goal_reach:
-			# print("reward for finishing puzzle")
+			print("reward for finishing puzzle")
 			return 500.
 		elif push_on_goal:
+			print("push on goal")
 			return 50.
 		elif box_pushing:
 			return -0.5
@@ -313,41 +309,44 @@ class DeepQAgent(Agent):
 		else:
 			return -1.
 
+	def append_reward(self, state, action, next_state, sokoban_map):
+		action_idx = 0
+		for i, a in enumerate(self.actions):
+			if np.array_equal(a, action):
+				action_idx = i
+		reward = self.reward(state, action, sokoban_map)
+		self.replay_buffer.add({
+			'action': action_idx,
+			'state': self.encode_state(state),
+			'reward': reward,
+			'next_state': self.encode_state(next_state),
+		})
+
 	def episode(self, draw=False, evaluate=False, max_iterations=1500):
 		self.environment.reset()
-		self.last_state, self.last_action = None, None
 		num_iteration = 0
 		while not self.environment.is_goal() and not self.environment.is_deadlock() and num_iteration < max_iterations:
 			self.steps += 1
-			last_state, last_action = self.last_state, self.last_action
+
+			sokoban_map = np.copy(self.environment.map)
 			state = np.copy(self.environment.state)
 			action = self.policy(self.environment.state, not evaluate)
 			self.environment.step(action)
+			next_state = np.copy(self.environment.state)
 			if draw:
 				self.environment.draw()
 
 			if not evaluate:
-				if last_state is not None:
-					action_idx = 0
-					for i, a in enumerate(self.actions):
-						if np.array_equal(a, last_action):
-							action_idx = i
-					reward = self.reward(last_state, last_action, self.environment.map)
-					self.replay_buffer.add({
-						'action': action_idx,
-						'state': self.encode_state(last_state),
-						'reward': reward,
-						'next_state': self.encode_state(state),
-					})
+				self.append_reward(state, action, next_state, sokoban_map)
+
 				if self.steps % self.learn_frequent == 0 and self.steps > self.replay_memory_size:
 					self.train_network()
 				if self.steps % self.target_update_frequent == 0:
 					self.update_target_network()
-			self.last_state = state
-			self.last_action = action
 
 			num_iteration += 1
-		print("steps: %d" % num_iteration)
+		print("steps: %d / goal: %s dead: %s" % (
+			num_iteration, self.environment.is_goal(), self.environment.is_deadlock()))
 		return self.environment.is_goal(), self.steps
 
 	def encode_state(self, state):
