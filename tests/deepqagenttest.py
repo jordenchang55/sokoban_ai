@@ -43,16 +43,22 @@ class DeepQAgentTest(unittest.TestCase):
         state = copy.deepcopy(self.environment.state)
         
         for direction in DIRECTIONS:
-            self.assertEquals(self.agent.reward(state, direction), -1., msg="Reward for standard movement is incorrect, should be -1.")
+            self.assertAlmostEquals(self.agent.reward(state, direction), -0.001, msg="Reward for standard movement is incorrect, should be -0.001.")
 
         for index, action in goal_sequence:
             if index == 6 or index == 14:
-                self.assertEquals(self.agent.reward(state, action), 50., msg="Reward for standard movement is incorrect, should be 50.")
+                self.assertAlmostEquals(self.agent.reward(state, action), 0.01, msg="Reward for standard movement is incorrect, should be 0.01.")
             elif index == len(goal_sequence) - 1:
-                self.assertEquals(self.agent.reward(state, action), 500., msg="Reward for standard movement is incorrect, should be 500.")
+                self.assertAlmostEquals(self.agent.reward(state, action), 1., msg="Reward for standard movement is incorrect, should be 1.")
             else:
-                self.assertEquals(self.agent.reward(state, action), -1., msg="Reward for standard movement is incorrect, should be -1.")
+                self.assertAlmostEquals(self.agent.reward(state, action), -0.001, msg="Reward for standard movement is incorrect, should be -0.001.")
             state = self.environment.next_state(state, action)
 
         #state = copy.deepcopy(self.environment.state)
+
+    # def test_target(self):
+    #     goal_sequence = [LEFT, DOWN, LEFT, LEFT, RIGHT, DOWN, RIGHT, DOWN, DOWN, LEFT, LEFT, LEFT, UP, LEFT, DOWN, RIGHT, UP, UP, UP, UP, LEFT, UP, RIGHT]
+
+        
+
 

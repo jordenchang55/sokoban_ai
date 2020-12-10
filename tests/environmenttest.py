@@ -23,7 +23,7 @@ class EnvironmentTest(unittest.TestCase):
     def test_init(self):
 
         self.assertEquals(self.environment.state[0, 7, 7], 1, msg=f"State does not reflect player's position.")
-        self.assertEquals(self.environment.state.shape, (2, 9, 9))
+        self.assertEquals(self.environment.state.shape, (4, 9, 9))
 
 
         player = self.environment.get_player(self.environment.state)

@@ -6,7 +6,7 @@ import numpy as np
 import agent
 from deepqagent import DeepQAgent
 from environment import Environment
-#from environment import DOWN, LEFT, RIGHT, UP
+import time
 iteration_max = 1000 #deadlock by iteration 
 
 def load(filename):
@@ -50,6 +50,7 @@ def train():
     # import matplotlib.patches as patches 
 
     max_episodes = abs(args.episodes)
+    max_iterations = abs(args.iterations)
 
     if len(args.command) < 2:
         raise Exception("Expected filepath input.")
@@ -59,47 +60,54 @@ def train():
     walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
 
     environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-    agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
+    agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
 
-    pretrain_path = Path("sokoban_state.pth")
-    if pretrain_path.exists() and pretrain_path.is_file():
-        agent.load("sokoban_state.pth")
+
+    if len(args.command) == 2:
+        pretrain_path = Path("sokoban_state.pth")
+        if pretrain_path.exists() and pretrain_path.is_file():
+            agent.load("sokoban_state.pth")
+        elif pretrain_path.exists() and not pretrain_path.is_file():
+            raise ValueError("Invalid pytorch file.")
+    else:
+        pretrain_path = Path(args.command[2])
+        if pretrain_path.exists() and pretrain_path.is_file():
+            agent.load(args.command[2])
+        elif pretrain_path.exists() and not pretrain_path.is_file():
+            raise ValueError("Invalid file input.")
 
 
     episode_bookmarks = []
     episode_iterations = []
 
-    num_episodes = 0
-    num_iterations = 0
     goals_reached = 0
-    iterative_threshold = 10000
-    while num_episodes < max_episodes:
+    if args.verbose:
+        print(f"{eps:>5s}.{iters:>7s}:")
+
+    while agent.num_episodes < max_episodes:
         # if num_episodes % 500 == 0 and num_episodes > 0: 
         #   iterative_threshold = iterative_threshold*2
 
-        goal, iterations = agent.episode(draw = args.draw)
+        goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
         if goal:
             goals_reached += 1
             episode_bookmarks.append(num_episodes)
             episode_iterations.append(iterations)
             #print(f"{num_episodes:5d}:goal reached.")
-        if num_episodes % 1 == 0:
-            print(f"{num_episodes:5d}:")
+        
 
 
-        if num_episodes > 0 and num_episodes % 100 == 0:
-            goal, iterations = agent.episode(draw = False, evaluate=True)
-            print("-"*20)
-            print(f"evaluation:{goal}")
-            if goal:
-                print(f"iterations:{iterations}")
-            print("-"*20)
+        if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
+            goal, iterations = agent.episode(draw = False, evaluate=True, max_iterations=200)
+
+        #num_episodes += 1
 
 
-        num_episodes += 1
-
-    agent.save("sokoban_state.pth")
+    if len(args.command) == 3:
+        agent.save(args.command[2])
+    else:
+        agent.save("sokoban_state.pth")
 
     episode_iterations = np.array(episode_iterations)
 
@@ -108,13 +116,14 @@ def train():
 
     print("-"*30)
     print("Simulation ended.")
-    print(f"episodes   :{num_episodes}")
+    print(f"episodes   :{agent.num_episodes}")
     print(f"map solved :{goal}")
     print(f"iterations :{iterations}")
 
 
 def evaluate():
     max_episodes = abs(args.episodes)
+
 
     if len(args.command) < 2:
         raise Exception("Expected filepath input.")
@@ -126,11 +135,13 @@ def evaluate():
     environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
     agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
 
+
     pretrain_path = Path("sokoban_state.pth")
     if pretrain_path.exists() and pretrain_path.is_file():
         agent.load("sokoban_state.pth")
 
-    agent.episode(draw = True, evaluate=True)
+
+    agent.episode(draw = False, evaluate=True)
 
 
 def test():
@@ -176,6 +187,49 @@ def draw():
     #if args.sequence:
 
 
+def time():
+    max_episodes = abs(args.episodes)
+
+
+    if len(args.command) < 3:
+        raise Exception("Expected 'time <input file> <output file>' format.")
+
+
+
+    walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
+
+    environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+    agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
+
+
+    for i in range(100):
+        print(f"{i:5d}.{0:7d}:")
+        agent.episode(draw = False, evaluate=False)
+
+
+    data = zip(range(100), gent.episode_times, agent.training_times)
+
+    with open(args.command[2], 'a') as file:
+        writer = csv.writer(file, delimiter=',')
+        for datum in data:
+            writer.writerow(datum)
+
+
+def plot():
+    data = []
+
+    if len(args.command) < 2:
+        raise Exception("Expected 'plot <csv file>' format.")
+
+    with open(args.command[0], 'r') as file:
+        reader = csv.reader(file, delimiter=',')
+        for row in reader:
+            data.append([int(row[0]), eval(row[1]), eval(row[2])])
+
+    data = zip(*data)
+
+    print(data)
+
 
 
 def main():
@@ -187,6 +241,8 @@ def main():
         draw()
     elif args.command[0] == "evaluate":
         evaluate()
+    elif args.command[0] == "time":
+        time()
     else:
         print("Unrecognized command. Please use sokoban.py --help for help on usage.")
     
@@ -194,7 +250,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Solve a Sokoban game using artificial intelligence.")
     parser.add_argument('--quiet', '-q', action='store_true')
     parser.add_argument('--verbose', '-v', action='store_true')
-    parser.add_argument('--episodes', '-e', action='store', type=int, default=5000)
+    parser.add_argument('--episodes', action='store', type=int, default=500)
+    parser.add_argument('--iterations', action='store', type=int, default=5000)
+    parser.add_argument('--learning_rate', action='store', type=float, default=1e-4)
+    parser.add_argument('--buffer_size', action='store', type=int, default=10000)
+    parser.add_argument('--minibatch_size', action='store', type=int, default=128)
+
+    parser.add_argument('--output', '-o', type=str)
     parser.add_argument('--save_figure', '-s', action='store_true')
     parser.add_argument('--draw', '-d', action='store_true')
     parser.add_argument('--sequence', type=str)

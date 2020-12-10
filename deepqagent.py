@@ -5,8 +5,10 @@ from agent import Agent
 import numpy as np
 from collections import deque
 import random
-
+import csv
+import time
 from pathlib import Path
+from torchvision import transforms
 class SokobanNet(nn.Module):
     def __init__(self, xlim, ylim, dropout=0.5):
         super(SokobanNet, self).__init__()
@@ -15,7 +17,7 @@ class SokobanNet(nn.Module):
         self.dropout = dropout
 
         channels = 4
-        self.conv1 = nn.Conv2d(2, channels, kernel_size = 3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(4, channels, kernel_size = 3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
         self.conv4 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
@@ -25,13 +27,13 @@ class SokobanNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(channels)
         self.bn4 = nn.BatchNorm2d(channels)
 
-        self.fc1 = nn.Linear(4*(xlim+1)*(ylim+1), 1024)
-        self.fc_bn1 = nn.BatchNorm1d(1024)
+        self.fc1 = nn.Linear(4*(26*26), 256)
+        self.fc_bn1 = nn.BatchNorm1d(256)
 
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc_bn2 = nn.BatchNorm1d(512)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc_bn2 = nn.BatchNorm1d(128)
 
-        self.fc4 = nn.Linear(512, 4)
+        self.fc4 = nn.Linear(128, 4)
 
     def forward(self, s):
         #s = s.view()
@@ -41,14 +43,18 @@ class SokobanNet(nn.Module):
         s = funct.relu(self.bn2(self.conv2(s)))
         s = funct.relu(self.bn3(self.conv3(s)))
         s = funct.relu(self.bn4(self.conv4(s)))
-        s = s.view(-1, 4*(self.xlim+1)*(self.ylim+1))
+        s = s.view(-1, 4*(26*26))
+
+        assert torch.isnan(s).any() == False, print("NaN numbers in tensor.")
 
         s = funct.dropout(funct.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
         s = funct.dropout(funct.relu(self.fc_bn2(self.fc2(s))), p=self.dropout, training=self.training)  # batch_size x 512
 
+        assert torch.isnan(s).any() == False, print("NaN numbers in tensor.")
+
         q = self.fc4(s)
 
-        return q
+        return torch.tanh(q)
 
 
 class ReplayBuffer:
@@ -74,25 +80,40 @@ class DeepQAgent(Agent):
 
 
 
-    def __init__(self, environment, discount_factor=0.95, minibatch_size = 64, verbose=False):
+    def __init__(self, environment, learning_rate=1e-4, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 32, buffer_size = 100000, verbose=False):
         super().__init__(environment)
 
         self.discount_factor = discount_factor
         self.minibatch_size = minibatch_size
+        self.buffer_size = buffer_size
+        self.greedy_rate = greedy_rate
         self.verbose = verbose
+
+        if self.environment.xlim > 25 or self.environment.ylim > 25:
+            raise ValueError("Map size too large for current DeepQAgent implementation.")
+        else:
+            self.pad_config = [(0, 26-(self.environment.xlim+1)), (0, 26-(self.environment.ylim+1))]
+
 
         #if torch.cuda.is_available():
         self.model = SokobanNet(self.environment.xlim, self.environment.ylim)
         if torch.cuda.is_available():
             self.model.cuda()
-            self.device = torch.device('cuda')
+            self.cuda_device = torch.device('cuda')
         else:
-            self.device = None
+            self.cuda_device = None
 
-        self.criterion = nn.MSELoss(reduction='sum')
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-6)
+        self.criterion = nn.MSELoss(reduction='sum').cuda() if self.cuda_device else nn.MSELoss(reduction='sum')
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
 
-        self.replay_buffer = ReplayBuffer(buffer_size = 500)
+        self.replay_buffer = ReplayBuffer(buffer_size = self.buffer_size)
+
+        self.action_sequence = None
+
+        self.training_times = []
+        self.episode_times = []
+
+        self.num_episodes = 0
 
         self.action_sequence = []
 
@@ -124,21 +145,21 @@ class DeepQAgent(Agent):
         state_hash = state.tobytes()
         if goal_reach:
             #print("reward for finishing puzzle")
-            return 500.
+            return 1.#500.
         elif push_on_goal:
             #next_state = self.next_state(state, action, sokoban_map)
             #self.inspiration.append((copy.deepcopy(state), copy.deepcopy(self.environment.has_scored)))
-            return 50. 
+            return 0.1#. 
         elif state_hash in self.environment.deadlock_table and any([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
             #print('deadlock reward')
-            return -5.
+            return -1.
         # elif box_pushing:
         #   return -0.5
         # elif self.environment.is_deadlock():
         #   #print("deadlock reward")
         #   return -2
         else:
-            return -1.
+            return -0.01
 
 
     def target(self, state, action):
@@ -156,62 +177,85 @@ class DeepQAgent(Agent):
                 return index
 
 
-    def predict(self, state):
-        tensor_state = torch.from_numpy(state).view(1, 2, 9, 9).float()
-        if torch.cuda.is_available():
-            tensor_state = tensor_state.to(device = self.device)
 
+
+    def train(self):
+        training_start = time.process_time()
+
+        self.model.train()
+
+        samples = self.replay_buffer.sample(self.minibatch_size)
+        
+
+        batch = np.pad(np.stack(samples, axis=0), [(0,0), (0,0), *self.pad_config])
+
+        tensor_state = torch.from_numpy(batch).view(-1, 4, 26, 26).float()
+        if self.cuda_device:
+            tensor_state = tensor_state.contiguous().cuda()
+        #print(tensor_state.size())
+
+        y_pred = self.model(tensor_state)
+        if self.cuda_device:
+            y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples], device=self.cuda_device)
+        else:
+            y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
+
+        assert (torch.max(y) <= 1.0).all(), "y exceeds 1."
+        self.model.train()
+        
+        loss = self.criterion(y_pred, y)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        self.training_times[-1].append(time.process_time() - training_start)
+
+    def predict(self, state):
+        pad_state = np.pad(state, [(0,0), *self.pad_config])
+        tensor_state = torch.from_numpy(pad_state).view(1, 4, 26, 26).float()
+        if self.cuda_device:
+            tensor_state = tensor_state.contiguous().cuda()
         self.model.eval()
         with torch.no_grad():
             return self.model(tensor_state)
 
 
     def episode(self, draw = False, evaluate = False, max_iterations=5000):
+        episode_start = time.process_time()
+        self.num_episodes += 1
+        print(f"{self.num_episodes:5d}.{0:7d}:")
 
         state = np.copy(self.environment.state)
-
+        self.training_times.append([])
         num_iterations = 0
         self.action_sequence = []
+
+        self.action_sequence = []
+        self.q_sequence = []
+
 
         if draw:
             self.environment.draw(state)
         while not self.environment.is_goal_state(state) and not self.environment.is_deadlock(state) and num_iterations < max_iterations:
-            tensor_state = torch.from_numpy(state).view(1, 2, 9, 9).float()
+            #tensor_state = torch.from_numpy(state).view(1, 4, 9, 9).float()
 
             
             if not evaluate:
                 if len(self.replay_buffer) >= self.minibatch_size:
-                    self.model.train()
+                    self.train()
 
-                    samples = self.replay_buffer.sample(self.minibatch_size)
-                    
-                    batch = np.stack(samples, axis=0)
-
-                    tensor_state = torch.from_numpy(batch).view(-1, 2, 9, 9).float()
-                    #print(tensor_state.size())
-                    if self.device:
-                        tensor_state = tensor_state.to(device=self.device)
-                    y_pred = self.model(tensor_state)
-                    y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
-                    if self.device:
-                        y = y.to(device=self.device)
-                    self.model.train()
-                    
-                    loss = self.criterion(y_pred, y)
-
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
-
-                if random.random() < 0.6:
+                if random.random() > self.greedy_rate:
                     chosen_action = random.choice(self.actions)
                 else:
                     chosen_action = self.actions[torch.argmax(self.predict(state))]
             else:
                 qvalues = self.predict(state)
                 if self.verbose:
-                    print(qvalues)
+                    print(f"{qvalues}:")
+                self.q_sequence.append(torch.max(qvalues))
                 chosen_action = self.actions[torch.argmax(qvalues)]
+                print(f"     .{num_iterations:7d}:{qvalues},{chosen_action}")
 
             self.action_sequence.append(chosen_action)
             state = self.environment.next_state(state, chosen_action)
@@ -226,20 +270,41 @@ class DeepQAgent(Agent):
                 print(f"     :{num_iterations}")
             num_iterations += 1
 
-            
 
+            if num_iterations > 0 and num_iterations%200 == 0:
+                print(f"     .{num_iterations:7d}:")
+
+
+            num_iterations += 1
+
+            
+        if num_iterations%1000 != 0:
+            print(f"     .{num_iterations:7d}:")
         goal_flag = self.environment.is_goal_state(state)
+
+        if evaluate:
+            qvalues = np.array(self.q_sequence)
+            qmean = qvalues.mean()
+            print("-"*20)
+            print(f"evaluation :{goal_flag}")
+            print(f"mean q(s,a):{qmean}")
+            if goal_flag:
+                print(f"iterations :{iterations}")
+            print("-"*20)
+
+
+
+
+
+        self.episode_times.append((num_iterations, time.process_time() - episode_start))
 
         return goal_flag, num_iterations
 
     def save_sequence(self, filename):
-
         with open(filename, 'w') as f:
-            import csv
             writer = csv.writer(f, delimiter=',')
             for action in self.action_sequence:
                 writer.writerow(action)
-
 
     def save(self, filename):
         '''

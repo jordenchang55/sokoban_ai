@@ -54,8 +54,8 @@ class Environment():
 
         self.fig = plt.figure()
 
-
-        self.state = np.zeros((2, xlim+1, ylim+1), dtype=np.double)#torch.zeros(xlim+1, ylim+1, 2)
+        #0 player plane, 1 box plane, 2 wall plane, 3 storage plane
+        self.state = np.zeros((4, xlim+1, ylim+1), dtype=np.double)#torch.zeros(xlim+1, ylim+1, 2)
         self.walls = np.zeros((xlim+1, ylim+1)) #torch.zeros(xlim+1, ylim+1)
         self.xlim = xlim
         self.ylim = ylim
@@ -66,9 +66,11 @@ class Environment():
         for wall in walls:
             #print(wall)
             self.walls[wall[0], wall[1]] = 1.
+            self.state[2, wall[0], wall[1]] = 1.
         for box in boxes:
             self.state[1, box[0], box[1]] = 1.
-
+        for place in storage:
+            self.state[3, place[0], place[1]] = 1.
         self.state[0, player[0], player[1]] = 1.
 
         self.deadlock_table = {}
