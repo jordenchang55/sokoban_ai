@@ -258,8 +258,13 @@ class DeepQAgent(Agent):
 		state_size = np.size(self.environment.state, axis=0)
 		self.position_one_hot = np.eye(self.environment.xlim * self.environment.ylim)
 
-		self.online_network = Network(state_size * len(self.position_one_hot), len(self.actions))
-		self.target_network = Network(state_size * len(self.position_one_hot), len(self.actions))
+		input_size = state_size * len(self.position_one_hot)
+		hidden_sizes = [
+			int(0.75 * (input_size + 4)),
+			int(0.25 * (input_size + 4))
+		]
+		self.online_network = Network(input_size, len(self.actions), hidden_sizes=hidden_sizes)
+		self.target_network = Network(input_size, len(self.actions), hidden_sizes=hidden_sizes)
 
 		self.update_target_network()
 

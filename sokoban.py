@@ -57,7 +57,12 @@ def main():
 
 	environment = Environment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
 	if args.agent == 'dqn':
-		agent = DeepQAgent(environment)
+		estimated_complex = environment.ylim * environment.xlim * len(boxes) * 6
+		agent = DeepQAgent(
+			environment, seed=3,
+			batch_size=int(0.7 * estimated_complex),
+			replay_memory_size=estimated_complex,
+			anneal_rate=(1 / 100000))
 	else:
 		agent = QAgent(environment)
 
