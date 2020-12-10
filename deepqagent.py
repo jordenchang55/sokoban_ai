@@ -54,7 +54,7 @@ class SokobanNet(nn.Module):
 
         q = self.fc4(s)
 
-        return torch.tanh(q)
+        return q
 
 
 class ReplayBuffer:
@@ -198,7 +198,6 @@ class DeepQAgent(Agent):
         else:
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
 
-        assert (torch.max(y) <= 1.0).all(), "y exceeds 1."
         self.model.train()
         
         loss = self.criterion(y_pred, y)
