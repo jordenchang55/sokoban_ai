@@ -4,11 +4,18 @@ import csv
 from pathlib import Path
 import numpy as np
 import agent
-from deepqagent import DeepQAgent
+
 from environment import Environment
 import time
 iteration_max = 1000 #deadlock by iteration 
 import random
+
+
+deep_keyword = "deep"
+box_keyword = "box"
+q_keyword = "q"
+
+
 
 def load(filename):
     filepath = Path(filename)
@@ -51,6 +58,7 @@ def train_all():
     '''
     randomly train on the different maps for the given amount of episodes...
     '''
+    from deepqagent import DeepQAgent
     input_path = Path("inputs/*.txt")
 
     file_list = list(input_path.glob())
@@ -101,8 +109,8 @@ def train_all():
 
     if len(args.command) == 3:
             agent.save(args.command[2])
-        else:
-            agent.save("sokoban_state.pth")
+    else:
+        agent.save("sokoban_state.pth")
 
 
     with open('losses.csv', 'w') as f:
@@ -114,8 +122,11 @@ def train_all():
 
 
 def train():
-    if len(args.command) < 2:
-        raise Exception("Expected filepath input.")
+    '''
+    sokoban.py train <agent> <input file>
+    '''
+    if len(args.command) < 3:
+        raise Exception("Expected agent and filepath input.")
     if args.all:
         train_all()
 
@@ -129,47 +140,61 @@ def train():
 
 
 
-    walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
+    walls, boxes, storage, player, xlim, ylim = load(args.command[2])    
+    environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
 
-    environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-    agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
+    if args.command[1] == "deep":
+        from deepqagent import DeepQAgent
+        agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
 
 
-    if len(args.command) == 2:
-        pretrain_path = Path("sokoban_state.pth")
-        if pretrain_path.exists() and pretrain_path.is_file():
-            agent.load("sokoban_state.pth")
-        elif pretrain_path.exists() and not pretrain_path.is_file():
-            raise ValueError("Invalid pytorch file.")
-    else:
-        pretrain_path = Path(args.command[2])
-        if pretrain_path.exists() and pretrain_path.is_file():
-            agent.load(args.command[2])
-        elif pretrain_path.exists() and not pretrain_path.is_file():
-            raise ValueError("Invalid file input.")
+        if len(args.command) < 4:
+            pretrain_path = Path("sokoban_state.pth")
+            if pretrain_path.exists() and pretrain_path.is_file():
+                agent.load("sokoban_state.pth")
+            elif pretrain_path.exists() and not pretrain_path.is_file():
+                raise ValueError("Invalid pytorch file.")
+        else:
+            pretrain_path = Path(args.command[2])
+            if pretrain_path.exists() and pretrain_path.is_file():
+                agent.load(args.command[2])
+            elif pretrain_path.exists() and not pretrain_path.is_file():
+                raise ValueError("Invalid file input.")
+
+    elif args.command[1] == "box":
+        from boxagent import BoxAgent
+        agent = BoxAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
+    elif args.command[1] == "q":
+        from agent import QAgent
+        agent = QAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
+
+    else: 
+        raise ValueError("Unexpected agent.")
 
 
     if args.verbose:
         print(f"{eps:>5s}.{iters:>7s}:")
 
+    goal_evaluated = False
     while agent.num_episodes < max_episodes:
         # if num_episodes % 500 == 0 and num_episodes > 0: 
         #   iterative_threshold = iterative_threshold*2
 
         goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
-        if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
-            goal, iterations = agent.episode(draw = False, evaluate=True, max_iterations=200)
+        if agent.num_episodes > 0 and agent.num_episodes % 500 == 0:
+            goal_evaluated, iterations = agent.episode(draw = False, evaluate=True, max_iterations=200)
 
+        if goal_evaluated:
+            break
         #num_episodes += 1
 
+    if args.command[1] == "deep":
+        if len(args.command) == 3:
+            agent.save(args.command[2])
+        else:
+            agent.save("sokoban_state.pth")
 
-    if len(args.command) == 3:
-        agent.save(args.command[2])
-    else:
-        agent.save("sokoban_state.pth")
-
-    episode_iterations = np.array(episode_iterations)
 
     goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
 
@@ -178,22 +203,36 @@ def train():
     print(f"episodes   :{agent.num_episodes}")
     print(f"map solved :{goal}")
     print(f"iterations :{iterations}")
+    print(f"deadlock hit rate:{environment.cache_hit/(environment.cache_miss+environment.cache_hit)}")
+    print("-"*30)
+
 
 
 def evaluate():
+    '''
+    sokoban.py evaluate <agent> <input>
+    '''
     max_episodes = abs(args.episodes)
 
 
-    if len(args.command) < 2:
-        raise Exception("Expected filepath input.")
+    if len(args.command) < 3:
+        raise Exception("Expected agent and filepath input.")
 
 
 
     walls, boxes, storage, player, xlim, ylim = load(args.command[1])    
 
     environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-    agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
-
+    
+    if args.command[1] == "deep":
+        from deepqagent import DeepQAgent
+        agent = DeepQAgent(environment = environment, discount_factor=0.95, verbose=args.verbose)
+    elif args.command[1] == "box":
+        from boxagent import BoxAgent
+        agent = BoxAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
+    elif args.command[1] == "q":
+        from agent import QAgent
+        agent = QAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
 
     pretrain_path = Path("sokoban_state.pth")
     if pretrain_path.exists() and pretrain_path.is_file():
@@ -319,7 +358,8 @@ if __name__ == '__main__':
     parser.add_argument('--save_figure', '-s', action='store_true')
     parser.add_argument('--draw', '-d', action='store_true')
     parser.add_argument('--sequence', type=str)
-    parser.add)argument('--all', action='store_true')
+    parser.add_argument('--all', action='store_true')
+    parser.add_argument('--pause', type=float, default=0.05)
     parser.add_argument('command', nargs='*')
     
     args = parser.parse_args()

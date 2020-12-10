@@ -50,22 +50,27 @@ def direction_to_str(direction):
 class Environment():
 
 
-    def __init__(self, walls, boxes, player, storage, xlim, ylim):
+    def __init__(self, walls, boxes, player, storage, xlim, ylim, pause=0.05):
 
         self.fig = plt.figure()
 
         #0 player plane, 1 box plane, 2 wall plane, 3 storage plane
         self.state = np.zeros((4, xlim+1, ylim+1), dtype=np.double)#torch.zeros(xlim+1, ylim+1, 2)
-        self.walls = np.zeros((xlim+1, ylim+1)) #torch.zeros(xlim+1, ylim+1)
+        #self.walls = np.zeros((xlim+1, ylim+1)) #torch.zeros(xlim+1, ylim+1)
         self.xlim = xlim
         self.ylim = ylim
 
+        self.boxes = np.array(boxes)
+        #print(self.boxes)
+
         self.storage = set(storage)
+
+        self.pause = pause
 
 
         for wall in walls:
             #print(wall)
-            self.walls[wall[0], wall[1]] = 1.
+            #self.walls[wall[0], wall[1]] = 1.
             self.state[2, wall[0], wall[1]] = 1.
         for box in boxes:
             self.state[1, box[0], box[1]] = 1.
@@ -76,9 +81,13 @@ class Environment():
         self.deadlock_table = {}
 
         self.original_state = copy.deepcopy(self.state)
+        self.original_boxes = copy.deepcopy(self.boxes)
         
         
         self.state_hash = None
+
+        self.cache_miss = 0
+        self.cache_hit = 0
 
 
 
@@ -100,7 +109,7 @@ class Environment():
         # print(f"player:{self.state[0]}")
         # print(f"reset_player:{self.original_player}")
         self.state = copy.deepcopy(self.original_state)
-
+        self.boxes = copy.deepcopy(self.original_boxes)
 
 #     def reset_map(self):
 #         for i in range(self.xlim):
@@ -120,7 +129,17 @@ class Environment():
 
 #         return True
 
-    
+    def is_valid(self, location):
+        x, y = location
+
+        return (x >= 0 and x <= self.xlim and y >= 0 and y <= self.ylim)
+
+    def count_boxes_scored(self, state):
+        count = 0
+        for place in self.storage:
+            if state[1, place[0], place[1]] == 1:
+                count += 1
+        return count
 
     def is_goal_state(self, state):
         for place in self.storage:
@@ -149,12 +168,12 @@ class Environment():
                 neighbor = tuple(neighbors[i])
                 next_neighbor = tuple(neighbors[(i+1)%len(neighbors)])
 
-                if self.walls[neighbor] == 1 and self.walls[next_neighbor] == 1:
+                if state[2, neighbor[0], neighbor[1]] == 1 and state[2, next_neighbor[0], next_neighbor[1]] == 1:
                     self.deadlock_table[self.state_hash][location.tobytes()] = True
 
                     #print("case 1")
                     return True
-                elif self.walls[neighbor] == 1 and state[1, next_neighbor[0], next_neighbor[1]] == 1:
+                elif state[2, neighbor[0], neighbor[1]] == 1 and state[1, next_neighbor[0], next_neighbor[1]] == 1:
                     #print("case 2")
                     if next_neighbor in previous:
                         #depndency cycle!
@@ -163,7 +182,7 @@ class Environment():
                     if self.is_frozen(state, np.array(next_neighbor), previous):
                         self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
-                elif state[1, neighbor[0], neighbor[1]] == 1 and self.walls[next_neighbor] == 1:
+                elif state[1, neighbor[0], neighbor[1]] == 1 and state[2, next_neighbor[0], next_neighbor[1]] == 1:
                     #print("case 3")
 
                     if neighbor in previous:
@@ -174,7 +193,7 @@ class Environment():
                     if self.is_frozen(state, np.array(neighbor), previous):
                         self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
-                elif state[1, neighbor[0], neighbor[1]] == BOX and state[1, next_neighbor[0], next_neighbor[1]] == BOX:
+                elif state[1, neighbor[0], neighbor[1]] == 1 and state[1, next_neighbor[0], next_neighbor[1]] == 1:
                     # print("case 4")
                     # print(neighbor in previous)
                     # print(next_neighbor in previous)
@@ -201,20 +220,18 @@ class Environment():
     def is_deadlock(self, state):
         # if not self.frozen_nodes:
         #   self.frozen_nodes = set([])
-        self.state_hash = state.tobytes()
+        self.state_hash = state[1,:,:].tobytes()
 
         if self.state_hash not in self.deadlock_table:
+            self.cache_miss += 1
             self.deadlock_table[self.state_hash] = {}
-        for i in range(state.shape[1]):
-            for j in range(state.shape[2]):
-                if state[1, i,j] == 1:
-                    box = np.array([i, j])
-                    if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
-                        return True
-                    elif self.is_frozen(state, box, previous=set([])):
-
-                        #self.frozen_nodes = None
-                        return True
+        else:
+            self.cache_hit += 1
+        for box in self.boxes:
+            if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
+                return True
+            elif self.is_frozen(state, box, previous=set([])):
+                return True
 
 
         #self.frozen_nodes = None
@@ -260,13 +277,20 @@ class Environment():
         if state[1, next_position[0], next_position[1]] == 1:
             next_box_position = next_position + action
 
-            if state[1, next_box_position[0], next_box_position[1]] == 0 and self.walls[tuple(next_box_position)] == 0:
+            if state[1, next_box_position[0], next_box_position[1]] == 0 and state[2, next_box_position[0], next_box_position[1]] == 0:
                 next_state[0, player[0], player[1]] = 0
                 next_state[0, next_position[0], next_position[1]] = 1
                 next_state[1, next_position[0], next_position[1]] = 0
 
                 next_state[1, next_box_position[0], next_box_position[1]] = 1
                 
+                for index in range(len(self.boxes)):
+                    if (self.boxes[index] == next_position).all():
+                        #print(f"before:{self.boxes[index]}")
+
+                        self.boxes[index] = next_box_position
+                        #print(f"after:{self.boxes[index]}")
+
 #                 for i in range(len(self.state[2:])):
 #                     if (self.state[i+2] == next_position).all():
 #                         self.state[i+2] = box_next_position 
@@ -275,9 +299,9 @@ class Environment():
 #                         break
                 
 
-        elif self.walls[next_position[0], next_position[1]] == 1:
+        elif state[2, next_position[0], next_position[1]] == 1:
             pass
-        elif state[1, next_position[0], next_position[1]] == 0 and self.walls[next_position[0], next_position[1]] == 0:
+        elif state[1, next_position[0], next_position[1]] == 0 and state[2, next_position[0], next_position[1]] == 0:
             #print("EMPTY")
             next_state[0, player[0], player[1]] = 0
             next_state[0, next_position[0], next_position[1]] = 1
@@ -320,15 +344,18 @@ class Environment():
         for i in range(self.xlim+1):
             for j in range(self.ylim+1):
                 #print((i,j))
-                if self.walls[i,j] == 1:
+                if state[2, i,j] == 1:
                     rect = patches.Rectangle((i+0.5, j+0.5),-1,-1,linewidth=0.5,edgecolor='slategray',facecolor='slategray')
                     ax.add_patch(rect)
 
                 elif state[0, i,j] == 1:
                     plt.plot(i, j, 'o', color='orange')
                 elif state[1, i,j] == 1:  
+                    # self.state_hash = state.tobytes()
+                    # if self.state_hash not in self.deadlock_table:
+                    #     self.deadlock_table[self.state_hash] = {}
                     # if self.is_frozen(state, np.array([i, j]), set([])):
-                    #     rect = patches.Rectangle((box[0]+0.5, box[1]+0.5), -1, -1, linewidth=0.5, edgecolor='red', facecolor='red')
+                    #     rect = patches.Rectangle((i+0.5, j+0.5), -1, -1, linewidth=0.5, edgecolor='red', facecolor='red')
                     # else:
                     rect = patches.Rectangle((i+0.5, j+0.5), -1, -1, linewidth=0.5, edgecolor='tan', facecolor='tan')
                     ax.add_patch(rect)
@@ -350,4 +377,4 @@ class Environment():
             # fig.canvas.restore_region(background)
             # fig.canvas.draw()
 
-            plt.pause(0.05)
+            plt.pause(self.pause)

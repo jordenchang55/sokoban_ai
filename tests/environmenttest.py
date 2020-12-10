@@ -78,6 +78,8 @@ class EnvironmentTest(unittest.TestCase):
             else:
                 self.assertTrue(self.environment.is_goal_state(current_state), msg="is_goal_state() returns false, despite being a valid goal state.")
 
+        self.assertTrue((self.environment.state[2,:,:]==current_state[2,:,:]).any(), msg="walls are not equal...")
+
 
     def test_is_deadlock(self):
         current_state = copy.deepcopy(self.environment.state)
@@ -89,6 +91,25 @@ class EnvironmentTest(unittest.TestCase):
             else:
                 self.assertTrue(self.environment.is_deadlock(current_state), msg="Should be in deadlock, but is_deadlock() reutrns false.")
 
+
+    def test_is_valid(self):
+        for i in range(10):
+            for j in range(10):
+                if i <= self.environment.xlim and j <= self.environment.ylim:
+                    self.assertTrue(self.environment.is_valid((i, j)), msg="Should be valid location.")
+                else:
+                    self.assertFalse(self.environment.is_valid((i, j)), msg="Should be invalid location.")
+
+    def test_count_boxes_scored(self):
+        current_state = copy.deepcopy(self.environment.state)
+
+        for index, action in enumerate(self.goal_sequence):
+            current_state = self.environment.next_state(current_state, action)
+
+            if index == len(self.goal_sequence) - 1:
+                self.assertEquals(self.environment.count_boxes_scored(current_state), 3, msg="is_goal_state() returns true, despite not being a valid goal state.")
+            # else:
+            #     self.assertTrue(self.environment.is_goal_state(current_state), msg="is_goal_state() returns false, despite being a valid goal state.")
 
     def tearDown(self):
 

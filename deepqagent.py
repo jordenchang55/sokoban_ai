@@ -19,15 +19,15 @@ class SokobanNet(nn.Module):
         channels = 4
         self.conv1 = nn.Conv2d(4, channels, kernel_size = 3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
-        self.conv4 = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(channels, channels, kernel_size=3, stride=1)
+        self.conv4 = nn.Conv2d(channels, channels, kernel_size=3, stride=1)
 
         self.bn1 = nn.BatchNorm2d(channels)
         self.bn2 = nn.BatchNorm2d(channels)
         self.bn3 = nn.BatchNorm2d(channels)
         self.bn4 = nn.BatchNorm2d(channels)
 
-        self.fc1 = nn.Linear(4*(26*26), 256)
+        self.fc1 = nn.Linear(4*(22*22), 256)
         self.fc_bn1 = nn.BatchNorm1d(256)
 
         self.fc2 = nn.Linear(256, 128)
@@ -43,7 +43,7 @@ class SokobanNet(nn.Module):
         s = funct.relu(self.bn2(self.conv2(s)))
         s = funct.relu(self.bn3(self.conv3(s)))
         s = funct.relu(self.bn4(self.conv4(s)))
-        s = s.view(-1, 4*(26*26))
+        s = s.view(-1, 4*(22*22))
 
         assert torch.isnan(s).any() == False, print("NaN numbers in tensor.")
 
@@ -160,7 +160,7 @@ class DeepQAgent(Agent):
         elif push_on_goal:
             #next_state = self.next_state(state, action, sokoban_map)
             #self.inspiration.append((copy.deepcopy(state), copy.deepcopy(self.environment.has_scored)))
-            return 0.1#. 
+            return 1.#. 
         elif state_hash in self.environment.deadlock_table and any([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
             #print('deadlock reward')
             return -1.
@@ -220,6 +220,7 @@ class DeepQAgent(Agent):
         self.optimizer.step()
 
         self.running_loss += loss.item()
+        self.times_trained += 1
 
         self.training_times[-1].append(time.process_time() - training_start)
 
@@ -257,7 +258,6 @@ class DeepQAgent(Agent):
             if not evaluate:
                 if len(self.replay_buffer) >= self.minibatch_size:
                     self.train()
-                    self.times_trained += 1
 
                 if random.random() > self.greedy_rate:
                     chosen_action = random.choice(self.actions)
@@ -298,11 +298,12 @@ class DeepQAgent(Agent):
             print(f"evaluation :{goal_flag}")
             print(f"mean q(s,a):{qmean}")
             if goal_flag:
-                print(f"iterations :{iterations}")
+                print(f"iterations :{num_iterations}")
             print("-"*20)
 
 
-        self.losses.append(self.running_loss/self.times_trained)
+        if self.times_trained != 0:
+            self.losses.append(self.running_loss/self.times_trained)
 
 
         self.episode_times.append((num_iterations, time.process_time() - episode_start))
