@@ -27,7 +27,7 @@ class SokobanNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(channels)
         self.bn4 = nn.BatchNorm2d(channels)
 
-        self.fc1 = nn.Linear(4*(26*26), 256)
+        self.fc1 = nn.Linear(4*(self.xlim+1)*(self.ylim+1), 256)
         self.fc_bn1 = nn.BatchNorm1d(256)
 
         self.fc2 = nn.Linear(256, 128)
@@ -43,7 +43,7 @@ class SokobanNet(nn.Module):
         s = funct.relu(self.bn2(self.conv2(s)))
         s = funct.relu(self.bn3(self.conv3(s)))
         s = funct.relu(self.bn4(self.conv4(s)))
-        s = s.view(-1, 4*(26*26))
+        s = s.view(-1, 4*(self.xlim+1)*(self.ylim+1))
 
         assert torch.isnan(s).any() == False, print("NaN numbers in tensor.")
 
@@ -54,7 +54,7 @@ class SokobanNet(nn.Module):
 
         q = self.fc4(s)
 
-        return torch.tanh(q)
+        return q
 
 
 class ReplayBuffer:
@@ -149,7 +149,7 @@ class DeepQAgent(Agent):
         elif push_on_goal:
             #next_state = self.next_state(state, action, sokoban_map)
             #self.inspiration.append((copy.deepcopy(state), copy.deepcopy(self.environment.has_scored)))
-            return 0.1#. 
+            return 1#. 
         elif state_hash in self.environment.deadlock_table and any([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
             #print('deadlock reward')
             return -1.
@@ -159,7 +159,7 @@ class DeepQAgent(Agent):
         #   #print("deadlock reward")
         #   return -2
         else:
-            return -0.01
+            return 0
 
 
     def target(self, state, action):
@@ -187,9 +187,9 @@ class DeepQAgent(Agent):
         samples = self.replay_buffer.sample(self.minibatch_size)
         
 
-        batch = np.pad(np.stack(samples, axis=0), [(0,0), (0,0), *self.pad_config])
+        batch = np.stack(samples, axis=0)
 
-        tensor_state = torch.from_numpy(batch).view(-1, 4, 26, 26).float()
+        tensor_state = torch.from_numpy(batch).view(-1, 4, self.environment.xlim+1, self.environment.ylim+1).float()
         if self.cuda_device:
             tensor_state = tensor_state.contiguous().cuda()
         #print(tensor_state.size())
@@ -200,7 +200,7 @@ class DeepQAgent(Agent):
         else:
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
 
-        assert (torch.max(y) <= 1.0).all(), "y exceeds 1."
+        #assert (torch.max(y) <= 1.0).all(), "y exceeds 1."
         self.model.train()
         
         loss = self.criterion(y_pred, y)
@@ -212,8 +212,8 @@ class DeepQAgent(Agent):
         self.training_times[-1].append(time.process_time() - training_start)
 
     def predict(self, state):
-        pad_state = np.pad(state, [(0,0), *self.pad_config])
-        tensor_state = torch.from_numpy(pad_state).view(1, 4, 26, 26).float()
+        #pad_state = np.pad(state, [(0,0), *self.pad_config])
+        tensor_state = torch.from_numpy(state).view(1, 4, self.environment.xlim+1, self.environment.ylim+1).float()
         if self.cuda_device:
             tensor_state = tensor_state.contiguous().cuda()
         self.model.eval()
