@@ -98,13 +98,8 @@ def train():
         
 
 
-        if agent.num_episodes > 0 and agent.num_episodes % 100 == 0:
-            goal, iterations = agent.episode(draw = False, evaluate=True, iterations=200)
-            print("-"*20)
-            print(f"evaluation:{goal}")
-            if goal:
-                print(f"iterations:{iterations}")
-            print("-"*20)
+        if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
+            goal, iterations = agent.episode(draw = False, evaluate=True, max_iterations=200)
 
         #num_episodes += 1
 

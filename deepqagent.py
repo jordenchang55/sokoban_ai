@@ -8,6 +8,7 @@ import random
 import csv
 import time
 from pathlib import Path
+from torchvision import transforms
 class SokobanNet(nn.Module):
     def __init__(self, xlim, ylim, dropout=0.5):
         super(SokobanNet, self).__init__()
@@ -44,12 +45,16 @@ class SokobanNet(nn.Module):
         s = funct.relu(self.bn4(self.conv4(s)))
         s = s.view(-1, 4*(26*26))
 
+        assert torch.isnan(s).any() == False, print("NaN numbers in tensor.")
+
         s = funct.dropout(funct.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
         s = funct.dropout(funct.relu(self.fc_bn2(self.fc2(s))), p=self.dropout, training=self.training)  # batch_size x 512
 
+        assert torch.isnan(s).any() == False, print("NaN numbers in tensor.")
+
         q = self.fc4(s)
 
-        return q
+        return torch.tanh(q)
 
 
 class ReplayBuffer:
@@ -75,7 +80,7 @@ class DeepQAgent(Agent):
 
 
 
-    def __init__(self, environment, learning_rate=1e-4, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 128, buffer_size = 10000, verbose=False):
+    def __init__(self, environment, learning_rate=1e-4, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 32, buffer_size = 100000, verbose=False):
         super().__init__(environment)
 
         self.discount_factor = discount_factor
@@ -138,21 +143,21 @@ class DeepQAgent(Agent):
         state_hash = state.tobytes()
         if goal_reach:
             #print("reward for finishing puzzle")
-            return 500.
+            return 1.#500.
         elif push_on_goal:
             #next_state = self.next_state(state, action, sokoban_map)
             #self.inspiration.append((copy.deepcopy(state), copy.deepcopy(self.environment.has_scored)))
-            return 50. 
+            return 0.1#. 
         elif state_hash in self.environment.deadlock_table and any([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
             #print('deadlock reward')
-            return -5.
+            return -1.
         # elif box_pushing:
         #   return -0.5
         # elif self.environment.is_deadlock():
         #   #print("deadlock reward")
         #   return -2
         else:
-            return -1.
+            return -0.01
 
 
     def target(self, state, action):
@@ -184,7 +189,7 @@ class DeepQAgent(Agent):
 
         tensor_state = torch.from_numpy(batch).view(-1, 4, 26, 26).float()
         if self.cuda_device:
-            tensor_state = tensor_state.to(device=self.cuda_device)
+            tensor_state = tensor_state.contiguous().cuda()
         #print(tensor_state.size())
 
         y_pred = self.model(tensor_state)
@@ -192,6 +197,8 @@ class DeepQAgent(Agent):
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples], device=self.cuda_device)
         else:
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
+
+        assert (torch.max(y) <= 1.0).all(), "y exceeds 1."
         self.model.train()
         
         loss = self.criterion(y_pred, y)
@@ -206,7 +213,7 @@ class DeepQAgent(Agent):
         pad_state = np.pad(state, [(0,0), *self.pad_config])
         tensor_state = torch.from_numpy(pad_state).view(1, 4, 26, 26).float()
         if self.cuda_device:
-            tensor_state = tensor_state.to(device=self.cuda_device)
+            tensor_state = tensor_state.contiguous().cuda()
         self.model.eval()
         with torch.no_grad():
             return self.model(tensor_state)
@@ -220,7 +227,10 @@ class DeepQAgent(Agent):
         state = np.copy(self.environment.state)
         self.training_times.append([])
         num_iterations = 0
+
         self.action_sequence = []
+        self.q_sequence = []
+
 
         if draw:
             self.environment.draw(state)
@@ -239,8 +249,10 @@ class DeepQAgent(Agent):
             else:
                 qvalues = self.predict(state)
                 if self.verbose:
-                    print(qvalues)
+                    print(f"{qvalues}:")
+                self.q_sequence.append(torch.max(qvalues))
                 chosen_action = self.actions[torch.argmax(qvalues)]
+                print(f"     .{num_iterations:7d}:{qvalues},{chosen_action}")
 
             self.action_sequence.append(chosen_action)
             state = self.environment.next_state(state, chosen_action)
@@ -252,7 +264,7 @@ class DeepQAgent(Agent):
                 self.environment.draw(state)
 
 
-            if num_iterations > 0 and num_iterations%1000 == 0:
+            if num_iterations > 0 and num_iterations%200 == 0:
                 print(f"     .{num_iterations:7d}:")
 
 
@@ -262,6 +274,20 @@ class DeepQAgent(Agent):
         if num_iterations%1000 != 0:
             print(f"     .{num_iterations:7d}:")
         goal_flag = self.environment.is_goal_state(state)
+
+        if evaluate:
+            qvalues = np.array(self.q_sequence)
+            qmean = qvalues.mean()
+            print("-"*20)
+            print(f"evaluation :{goal_flag}")
+            print(f"mean q(s,a):{qmean}")
+            if goal_flag:
+                print(f"iterations :{iterations}")
+            print("-"*20)
+
+
+
+
 
         self.episode_times.append((num_iterations, time.process_time() - episode_start))
 
