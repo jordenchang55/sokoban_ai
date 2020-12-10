@@ -256,9 +256,10 @@ class DeepQAgent(Agent):
 		super().__init__(environment, seed=seed, *args, **kwargs)
 
 		state_size = np.size(self.environment.state, axis=0)
+		self.position_one_hot = np.eye(self.environment.xlim * self.environment.ylim)
 
-		self.online_network = Network(state_size, len(self.actions))
-		self.target_network = Network(state_size, len(self.actions))
+		self.online_network = Network(state_size * len(self.position_one_hot), len(self.actions))
+		self.target_network = Network(state_size * len(self.position_one_hot), len(self.actions))
 
 		self.update_target_network()
 
@@ -280,7 +281,7 @@ class DeepQAgent(Agent):
 		if training and explore:
 			action_idx = np.random.randint(len(self.actions))
 		else:
-			inputs = np.array([self.encode_state(state)])
+			inputs = self.encode_position(self.encode_state(state))
 			qvalues = self.online_network.predict(inputs)
 			action_idx = np.argmax(qvalues, axis=-1)[0]
 
@@ -309,7 +310,7 @@ class DeepQAgent(Agent):
 		else:
 			return -0.002
 
-	def append_reward(self, state, action, next_state, sokoban_map):
+	def append_reward(self, state, action, next_state, sokoban_map, terminated):
 		action_idx = 0
 		for i, a in enumerate(self.actions):
 			if np.array_equal(a, action):
@@ -320,12 +321,14 @@ class DeepQAgent(Agent):
 			'state': self.encode_state(state),
 			'reward': reward,
 			'next_state': self.encode_state(next_state),
+			'continued': not terminated,
 		})
 
 	def episode(self, draw=False, evaluate=False, max_iterations=1500):
 		self.environment.reset()
 		num_iteration = 0
-		while not self.environment.is_goal() and not self.environment.is_deadlock() and num_iteration < max_iterations:
+		should_terminated = False
+		while not should_terminated and num_iteration < max_iterations:
 			self.steps += 1
 
 			sokoban_map = np.copy(self.environment.map)
@@ -333,11 +336,12 @@ class DeepQAgent(Agent):
 			action = self.policy(self.environment.state, not evaluate)
 			self.environment.step(action)
 			next_state = np.copy(self.environment.state)
+			should_terminated = self.environment.is_goal() or self.environment.is_deadlock()
 			if draw:
 				self.environment.draw()
 
 			if not evaluate:
-				self.append_reward(state, action, next_state, sokoban_map)
+				self.append_reward(state, action, next_state, sokoban_map, should_terminated)
 
 				if self.steps % self.learn_frequent == 0 and self.steps > self.replay_memory_size:
 					self.train_network()
@@ -352,24 +356,32 @@ class DeepQAgent(Agent):
 	def encode_state(self, state):
 		return np.sum((state + [0, -1]) * [1, self.environment.xlim], axis=1)
 
+	def encode_position(self, positions):
+		one_hot = self.position_one_hot[positions]
+		return one_hot.reshape((1, -1))
+
 	def decode_state(self, arr):
 		return np.array([
 			((arr - 1) / self.environment.xlim + 1).astype(int),
 			(arr - 1) % self.environment.xlim + 1
 		]).reshape((-1, 2), order='F')
 
+	def decode_position(self, one_hot):
+		return one_hot.reshape((-1, len(self.position_one_hot)))
+
 	def train_network(self):
 		batch = self.replay_buffer.sample(self.batch_size)
-		inputs = np.array([b["state"] for b in batch])
+		inputs = np.array([self.encode_position(b["state"]) for b in batch])
 		actions = np.array([b["action"] for b in batch])
 		rewards = np.array([b["reward"] for b in batch])
-		next_inputs = np.array([b["next_state"] for b in batch])
+		next_inputs = np.array([self.encode_position(b["next_state"]) for b in batch])
+		continued = np.array([b["continued"] for b in batch])
 		actions_one_hot = np.eye(len(self.actions))[actions]
 
-		next_qvalues = self.target_network.predict(next_inputs)
-		targets = rewards + self.discount_factor * tf.reduce_max(next_qvalues, axis=1)
+		next_qvalues = self.target_network.predict(np.squeeze(next_inputs))
+		targets = rewards + (continued * self.discount_factor) * tf.reduce_max(next_qvalues, axis=1)
 
-		return self.online_network.train_step(inputs, targets, actions_one_hot)
+		return self.online_network.train_step(np.squeeze(inputs), targets, actions_one_hot)
 
 	def update_target_network(self):
 		self.target_network.model.set_weights(self.online_network.model.get_weights())
