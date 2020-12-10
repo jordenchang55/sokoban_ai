@@ -103,17 +103,30 @@ class DeepQAgent(Agent):
         else:
             self.cuda_device = None
 
+        #mse and sgd algorithm
         self.criterion = nn.MSELoss(reduction='sum').cuda() if self.cuda_device else nn.MSELoss(reduction='sum')
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
 
+        #replay buffer. new per agent
         self.replay_buffer = ReplayBuffer(buffer_size = self.buffer_size)
 
         self.action_sequence = None
 
+        #for profiling training and episodes
         self.training_times = []
         self.episode_times = []
 
+        #for graphing loss
+        self.running_loss = 0
+        self.losses = []
+
+        #internal record of number episodes run 
         self.num_episodes = 0
+        self.times_trained = 0
+
+    def load_environment(self, environment):
+        self.environment = environment
+        self.pad_config = [(0, 26-(self.environment.xlim+1)), (0, 26-(self.environment.ylim+1))]
 
 
     def reward(self, state, action):
@@ -206,6 +219,8 @@ class DeepQAgent(Agent):
         loss.backward()
         self.optimizer.step()
 
+        self.running_loss += loss.item()
+
         self.training_times[-1].append(time.process_time() - training_start)
 
     def predict(self, state):
@@ -229,7 +244,9 @@ class DeepQAgent(Agent):
 
         self.action_sequence = []
         self.q_sequence = []
-
+ 
+        self.running_loss = 0
+        self.times_trained = 0
 
         if draw:
             self.environment.draw(state)
@@ -240,6 +257,7 @@ class DeepQAgent(Agent):
             if not evaluate:
                 if len(self.replay_buffer) >= self.minibatch_size:
                     self.train()
+                    self.times_trained += 1
 
                 if random.random() > self.greedy_rate:
                     chosen_action = random.choice(self.actions)
@@ -249,7 +267,7 @@ class DeepQAgent(Agent):
                 qvalues = self.predict(state)
                 if self.verbose:
                     print(f"{qvalues}:")
-                self.q_sequence.append(torch.max(qvalues))
+                self.q_sequence.append(np.array(torch.max(qvalues).cpu()))
                 chosen_action = self.actions[torch.argmax(qvalues)]
                 print(f"     .{num_iterations:7d}:{qvalues},{chosen_action}")
 
@@ -268,7 +286,6 @@ class DeepQAgent(Agent):
 
 
             num_iterations += 1
-
             
         if num_iterations%1000 != 0:
             print(f"     .{num_iterations:7d}:")
@@ -285,7 +302,7 @@ class DeepQAgent(Agent):
             print("-"*20)
 
 
-
+        self.losses.append(self.running_loss/self.times_trained)
 
 
         self.episode_times.append((num_iterations, time.process_time() - episode_start))
