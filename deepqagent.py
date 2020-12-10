@@ -54,7 +54,7 @@ class SokobanNet(nn.Module):
 
         q = self.fc4(s)
 
-        return q
+        return torch.tanh(q)
 
 
 class ReplayBuffer:
@@ -197,7 +197,7 @@ class DeepQAgent(Agent):
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples], device=self.cuda_device)
         else:
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
-
+        y = torch.tanh(y)
         self.model.train()
         
         loss = self.criterion(y_pred, y)
