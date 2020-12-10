@@ -297,17 +297,17 @@ class DeepQAgent(Agent):
 
 		if goal_reach:
 			print("reward for finishing puzzle")
-			return 500.
+			return 1.
 		elif push_on_goal:
 			print("push on goal")
-			return 50.
+			return 0.1
 		elif box_pushing:
-			return -0.5
+			return -0.001
 		elif self.environment.is_deadlock():
 			# print("deadlock reward")
-			return -2.
+			return -0.004
 		else:
-			return -1.
+			return -0.002
 
 	def append_reward(self, state, action, next_state, sokoban_map):
 		action_idx = 0
