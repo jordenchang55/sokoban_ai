@@ -6,7 +6,7 @@ import numpy as np
 import agent
 
 from environment import Environment
-import time
+from time import process_time
 iteration_max = 1000 #deadlock by iteration 
 import random
 
@@ -136,15 +136,16 @@ def train():
     max_episodes = abs(args.episodes)
     max_iterations = abs(args.iterations)
 
-    
+    start_time = process_time()
 
 
 
     walls, boxes, storage, player, xlim, ylim = load(args.command[2])    
-    environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
 
     if args.command[1] == "deep":
         from deepqagent import DeepQAgent
+        environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
+
         agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
 
 
@@ -163,17 +164,22 @@ def train():
 
     elif args.command[1] == "box":
         from boxagent import BoxAgent
+        from state_environment import StateEnvironment
+
+        environment = StateEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
+
         agent = BoxAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
     elif args.command[1] == "q":
         from agent import QAgent
+        environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
+
         agent = QAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
 
     else: 
         raise ValueError("Unexpected agent.")
 
 
-    if args.verbose:
-        print(f"{eps:>5s}.{iters:>7s}:")
+    
 
     goal_evaluated = False
     while agent.num_episodes < max_episodes:
@@ -183,7 +189,7 @@ def train():
         goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
         if agent.num_episodes > 0 and agent.num_episodes % 500 == 0:
-            goal_evaluated, iterations = agent.episode(draw = False, evaluate=True, max_iterations=200)
+            goal_evaluated, iterations = agent.episode(draw = True, evaluate=True, max_iterations=200)
 
         if goal_evaluated:
             break
@@ -200,12 +206,13 @@ def train():
 
     print("-"*30)
     print("Simulation ended.")
-    print(f"episodes   :{agent.num_episodes}")
-    print(f"map solved :{goal}")
-    print(f"iterations :{iterations}")
-    print(f"deadlock hit rate:{environment.cache_hit/(environment.cache_miss+environment.cache_hit)}")
+    print(f"episodes         :{agent.num_episodes}")
+    print(f"map solved       :{goal}")
+    print(f"iterations       :{iterations}")
+    print(f"deadlock hit rate:{environment.cache_hit/(environment.cache_miss+environment.cache_hit):.3f}")
+    print(f"time taken       :{process_time()-start_time:.3f}")
     print("-"*30)
-
+    plt.show(block=True)
 
 
 def evaluate():
@@ -244,7 +251,8 @@ def evaluate():
 
 def test():
     import unittest
-    import tests.environmenttest 
+    import tests.state_environment_test
+
     import tests.deepqagenttest
 
     import logging
@@ -252,7 +260,7 @@ def test():
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
 
-    suite.addTests(loader.loadTestsFromModule(tests.environmenttest))
+    suite.addTests(loader.loadTestsFromModule(tests.stateenvironmenttest))
     suite.addTests(loader.loadTestsFromModule(tests.deepqagenttest))
 
 
@@ -349,7 +357,7 @@ if __name__ == '__main__':
     parser.add_argument('--quiet', '-q', action='store_true')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--episodes', action='store', type=int, default=500)
-    parser.add_argument('--iterations', action='store', type=int, default=5000)
+    parser.add_argument('--iterations', action='store', type=int, default=3000)
     parser.add_argument('--learning_rate', action='store', type=float, default=1e-4)
     parser.add_argument('--buffer_size', action='store', type=int, default=500000)
     parser.add_argument('--minibatch_size', action='store', type=int, default=128)
@@ -360,6 +368,7 @@ if __name__ == '__main__':
     parser.add_argument('--sequence', type=str)
     parser.add_argument('--all', action='store_true')
     parser.add_argument('--pause', type=float, default=0.05)
+    parser.add_argument('--time', type=int)
     parser.add_argument('command', nargs='*')
     
     args = parser.parse_args()

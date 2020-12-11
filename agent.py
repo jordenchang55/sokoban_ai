@@ -3,30 +3,33 @@ import random
 
 import numpy as np
 
-import environment
 import copy
 #from environment import MapType
 
 
 from collections import namedtuple
-State = namedtuple('State', ['player', 'boxes'])
+from environment import Environment
 
 class Agent():
-    actions = [environment.UP, environment.RIGHT, environment.DOWN, environment.LEFT]
+    actions = [Environment.UP, Environment.RIGHT, Environment.DOWN, Environment.LEFT]
 
     def __init__(self, environment, *args, **kwargs):
         self.environment = environment
 
         self.print_threshold = 200
 
+    def reward(self, state, action):
+        raise NotImplementedError
+    def learn(self, state):
 
-    def learn(self, state, sokoban_map):
-
-        return random.choice(self.actions)
+        raise NotImplementedError
 
 
-    def evaluate(self, state, sokoban_map):
-        return random.choice(self.actions)
+    def evaluate(self, state):
+        raise NotImplementedError
+
+    def episode(self):
+        raise NotImplementedError
 
 
 
