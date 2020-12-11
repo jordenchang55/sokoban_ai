@@ -1,6 +1,7 @@
 import argparse
 import csv
 # import matplotlib.patches as patches
+import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -13,17 +14,22 @@ from environment import Environment
 
 # from environment import MapType
 
-# def debug_print(fmt_string):
-# 	print(fmt_string)
+# def debug_logging.info(fmt_string):
+# 	logging.info(fmt_string)
 # control variables
 iteration_max = 1000  # deadlock by iteration
+
+logging.basicConfig(
+	format='%(asctime)s %(levelname)-8s %(message)s',
+	level=logging.INFO,
+	datefmt='%Y-%m-%d %H:%M:%S')
 
 
 def main():
 	max_episodes = abs(args.episodes)
 
 	filepath = Path(args.filename)
-	# print(args.filename)
+	# logging.info(args.filename)
 	if not filepath.exists():
 		raise ValueError("Path does not exist.")
 	if not filepath.is_file():
@@ -38,7 +44,7 @@ def main():
 
 				return [tuple([int(points[index + 1]), int(points[index])]) for index in range(1, len(points), 2)]
 
-			# print(index, row)
+			# logging.info(index, row)
 
 			if index == 0:
 				# sizeH, sizeV
@@ -46,7 +52,7 @@ def main():
 				xlim = int(row[0])
 				ylim = int(row[1])
 			if index == 1:
-				# print(MapType.WALL.value)
+				# logging.info(MapType.WALL.value)
 				walls = unpack(row)
 			elif index == 2:
 				boxes = unpack(row)
@@ -78,31 +84,31 @@ def main():
 			goals_reached += 1
 			episode_bookmarks.append(num_episodes)
 			episode_iterations.append(iterations)
-		# print(f"{num_episodes:5d}:goal reached.")
+		# logging.info(f"{num_episodes:5d}:goal reached.")
 		if num_episodes % 100 == 0:
-			print(f"{num_episodes:5d}:")
+			logging.info(f"{num_episodes:5d}:")
 
 		if num_episodes > 0 and num_episodes % 1000 == 0:
 			goal, iterations = agent.episode(draw=True, evaluate=True, max_iterations=200)
 			if args.save_network:
 				map_name = args.filename.split("/")[-1].split(".")[0]
 				agent.save("outputs/%s_%d_%s" % (map_name, num_episodes, goal))
-			print("-" * 20)
-			print(f"evaluation:{goal}")
+			logging.info("-" * 20)
+			logging.info(f"evaluation:{goal}")
 			if goal:
-				print(f"iterations:{iterations}")
-			print("-" * 20)
+				logging.info(f"iterations:{iterations}")
+			logging.info("-" * 20)
 
 		num_episodes += 1
 	episode_iterations = np.array(episode_iterations)
 
 	goal, iterations = agent.episode(draw=True, evaluate=True, max_iterations=200)
 
-	print("-" * 30)
-	print("Simulation ended.")
-	print(f"episodes   :{num_episodes}")
-	print(f"map solved :{goal}")
-	print(f"iterations :{iterations}")
+	logging.info("-" * 30)
+	logging.info("Simulation ended.")
+	logging.info(f"episodes   :{num_episodes}")
+	logging.info(f"map solved :{goal}")
+	logging.info(f"iterations :{iterations}")
 
 	plt.show(block=True)
 

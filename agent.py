@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from collections import namedtuple
@@ -85,14 +86,14 @@ class QAgent(Agent):
 			goal_reach = False
 
 		if goal_reach:
-			# print("reward for finishing puzzle")
+			# logging.info("reward for finishing puzzle")
 			return 500.
 		elif push_on_goal:
 			return 50.
 		elif box_pushing:
 			return -0.5
 		elif self.environment.is_deadlock():
-			# print("deadlock reward")
+			# logging.info("deadlock reward")
 			return -2
 		else:
 			return -1
@@ -134,7 +135,7 @@ class QAgent(Agent):
 		return next_state
 
 	def update(self, state, action, sokoban_map):
-		# print(self.encode(state, action))
+		# logging.info(self.encode(state, action))
 		if self.encode(state, action) not in self.qtable:
 			self.qtable[self.encode(state, action)] = 0.
 
@@ -151,7 +152,7 @@ class QAgent(Agent):
 				self.reward(state, action, sokoban_map) + self.discount_factor * qmax - self.qtable[
 			self.encode(state, action)])
 
-	# print(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
+	# logging.info(f"{self.encode(state, action)}:{self.qtable[self.encode(state, action)]}")
 
 	def learn(self, state, sokoban_map):
 		# exploration
@@ -168,15 +169,15 @@ class QAgent(Agent):
 		for possible_action in self.get_actions(state, sokoban_map):
 
 			if self.verbose:
-				print(
+				logging.info(
 					f"{environment.direction_to_str(possible_action)}:{self.qtable[self.encode(state, possible_action)]}")
 
 			if self.encode(state, possible_action) not in self.qtable:
 				self.qtable[self.encode(state,
 										possible_action)] = 0.  # represents an unseen state... not ideal while evaluating
 
-			# print(possible_action)
-			# print(self.qtable[self.encode(state, possible_action)])
+			# logging.info(possible_action)
+			# logging.info(self.qtable[self.encode(state, possible_action)])
 
 			if chosen_action is None:
 				chosen_action = possible_action
@@ -188,7 +189,7 @@ class QAgent(Agent):
 					chosen_action = possible_action
 					chosen_value = potential_value
 
-		# print(f"chosen action:{chosen_action}")
+		# logging.info(f"chosen action:{chosen_action}")
 		return chosen_action
 
 	def replay(self):
@@ -302,15 +303,15 @@ class DeepQAgent(Agent):
 		goal_reach = push_on_goal and num_of_boxes - 1 == (sokoban_map == environment.BOX_IN_GOAL).sum()
 
 		if goal_reach:
-			print("reward for finishing puzzle")
+			logging.info("reward for finishing puzzle")
 			return 1.
 		elif push_on_goal:
-			print("push on goal")
+			logging.info("push on goal")
 			return 0.1
 		elif box_pushing:
 			return -0.001
 		elif self.environment.is_deadlock():
-			# print("deadlock reward")
+			# logging.info("deadlock reward")
 			return -0.004
 		else:
 			return -0.002
@@ -354,7 +355,7 @@ class DeepQAgent(Agent):
 					self.update_target_network()
 
 			num_iteration += 1
-		print("steps: %d / goal: %s dead: %s" % (
+		logging.info("steps: %d / goal: %s dead: %s" % (
 			num_iteration, self.environment.is_goal(), self.environment.is_deadlock()))
 		return self.environment.is_goal(), self.steps
 

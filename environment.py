@@ -71,9 +71,9 @@ class Environment():
 		self.original_state = copy.deepcopy(self.state)
 
 	def reset(self):
-		# print("reset!")
-		# print(f"player:{self.state[0]}")
-		# print(f"reset_player:{self.original_player}")
+		# logging.info("reset!")
+		# logging.info(f"player:{self.state[0]}")
+		# logging.info(f"reset_player:{self.original_player}")
 		self.map = copy.deepcopy(self.original_map)
 		self.state = copy.deepcopy(self.original_state)
 		self.box_in_goal = [False for box in self.state[1:]]
@@ -100,10 +100,10 @@ class Environment():
 				next_neighbor = tuple(neighbors[(i + 1) % len(neighbors)])
 
 				if self.map[neighbor] == WALL and self.map[next_neighbor] == WALL:
-					# print("case 1")
+					# logging.info("case 1")
 					return True
 				elif self.map[neighbor] == WALL and self.map[next_neighbor] == BOX:
-					# print("case 2")
+					# logging.info("case 2")
 					if next_neighbor in previous:
 						# depndency cycle!
 						self.deadlock_table[self.state_hash][location.tobytes()] = True
@@ -112,7 +112,7 @@ class Environment():
 						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
 				elif self.map[neighbor] == BOX and self.map[next_neighbor] == WALL:
-					# print("case 3")
+					# logging.info("case 3")
 
 					if neighbor in previous:
 						# dependency cycle!
@@ -123,9 +123,9 @@ class Environment():
 						self.deadlock_table[self.state_hash][location.tobytes()] = True
 						return True
 				elif self.map[neighbor] == BOX and self.map[next_neighbor] == BOX:
-					# print("case 4")
-					# print(neighbor in previous)
-					# print(next_neighbor in previous)
+					# logging.info("case 4")
+					# logging.info(neighbor in previous)
+					# logging.info(next_neighbor in previous)
 					if neighbor in previous:
 						frozen_neighbor = True
 					else:
@@ -166,7 +166,7 @@ class Environment():
 	def step(self, action):
 		next_position = self.state[0] + action
 		if self.map[tuple(next_position)] == BOX:
-			# print("BOX")
+			# logging.info("BOX")
 
 			box_next_position = next_position + action
 
@@ -191,11 +191,11 @@ class Environment():
 				return self.state[0]
 
 		elif self.map[tuple(next_position)] == WALL:
-			# print(tuple(next_position))
-			# print("WALL")
+			# logging.info(tuple(next_position))
+			# logging.info("WALL")
 			return self.state[0]
 		elif self.map[tuple(next_position)] == EMPTY:
-			# print("EMPTY")
+			# logging.info("EMPTY")
 			self.map[tuple(self.state[0])] = EMPTY
 			self.map[tuple(next_position)] = PLAYER
 			self.state[0] = next_position
@@ -208,10 +208,10 @@ class Environment():
 	# 		action = self.actor.learn(State(self.state[0], self.state[1:]), self.map)
 	# 	else:
 	# 		action = self.actor.evaluate(State(self.state[0], self.state[1:]), self.map)
-	# 	#print(move)
-	# 	#print(move)
+	# 	#logging.info(move)
+	# 	#logging.info(move)
 	# 	next_position = action + self.state[0]
-	# 	#print(next_position)
+	# 	#logging.info(next_position)
 
 	def draw(self, save_figure=False):
 
@@ -227,7 +227,7 @@ class Environment():
 
 		for i in range(self.map.shape[0]):
 			for j in range(self.map.shape[1]):
-				# print((i,j))
+				# logging.info((i,j))
 				if self.map[i, j] == WALL:
 					rect = patches.Rectangle((i + 0.5, j + 0.5), -1, -1, linewidth=0.5, edgecolor='slategray',
 											 facecolor='slategray')
