@@ -156,7 +156,7 @@ class DeepQAgent(Agent):
         state_hash = state.tobytes()
         if goal_reach:
             return 1.#500.
-        elif push_on_goal and self.boxes_scored < self.environment.count_boxes_scored(self.next_state(state, action)):
+        elif push_on_goal and self.boxes_scored < self.environment.count_boxes_scored(self.environment.next_state(state, action)):
             return 1.#. 
         elif self.environment.is_deadlock(state):
             return -1.
@@ -275,6 +275,7 @@ class DeepQAgent(Agent):
             for symmetry in symmetries:
                     self.replay_buffer.add(symmetry)
 
+            num_boxes_scored = self.environment.count_boxes_scored(state)
             if self.boxes_scored < num_boxes_scored:
                 self.boxes_scored = num_boxes_scored
 
