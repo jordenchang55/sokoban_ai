@@ -157,9 +157,9 @@ def train():
             elif pretrain_path.exists() and not pretrain_path.is_file():
                 raise ValueError("Invalid pytorch file.")
         else:
-            pretrain_path = Path(args.command[2])
+            pretrain_path = Path(args.command[3])
             if pretrain_path.exists() and pretrain_path.is_file():
-                agent.load(args.command[2])
+                agent.load(args.command[3])
             elif pretrain_path.exists() and not pretrain_path.is_file():
                 raise ValueError("Invalid file input.")
 

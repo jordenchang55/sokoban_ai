@@ -28,10 +28,10 @@ class SokobanNet(nn.Module):
 
         self.fc1 = nn.Linear((4*(DeepQAgent.INPUT_SIZE-4)**2), 64) ##CHANGE TO 256 128
         self.fc_bn1 = nn.BatchNorm1d(64)
-        init.kaiming_normal(fc1)
+        init.kaiming_normal_(self.fc1.weight)
 
         self.fc2 = nn.Linear(64, 32)
-        init.kaiming_normal(fc2)
+        init.kaiming_normal_(self.fc2.weight)
         self.fc_bn2 = nn.BatchNorm1d(32)
 
         self.fc4 = nn.Linear(32, 4)
