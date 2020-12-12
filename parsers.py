@@ -1,3 +1,5 @@
+import argparse
+
 def parse_map(file):
 	maps = []
 	with open(file, 'r') as f:
@@ -39,10 +41,10 @@ def parse_map(file):
 	return maps
 
 
-def save_map(maps):
-	i = 2
+def save_map(maps, prefix, output):
+	i = 1
 	for m in maps:
-		with open('inputs/sokoban%02d.txt' % i, 'w') as f:
+		with open('%s/%s%02d.txt' % (output, prefix, i), 'w') as f:
 			f.writelines([
 				'%d %d' % (m['width'], m['height']) + '\n',
 				'%d ' % len(m['walls']) + ' '.join(['%d %d' % t for t in m['walls']]) + '\n',
@@ -54,5 +56,11 @@ def save_map(maps):
 
 
 if __name__ == '__main__':
-	maps = parse_map('maps/maps.txt')
-	save_map(maps)
+	parser = argparse.ArgumentParser(description="Parsing map file to input format")
+	parser.add_argument("--src")
+	parser.add_argument("--output", "-o", default="inputs")
+	parser.add_argument("--prefix", "-p")
+	args = parser.parse_args()
+
+	maps = parse_map(args.src)
+	save_map(maps, args.prefix, args.output)
