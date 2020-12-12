@@ -1,0 +1,314 @@
+**************
+Maze: 
+
+Size X: 7
+Size Y: 9
+
+
+
+XXXXXXX
+X@ XXXX
+X * XXX
+X  .* X
+XXX.  X
+XXX   X
+XXX * X
+XXXX  X
+XXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 7
+Size Y: 9
+
+
+
+XXXXXXX
+XXX   X
+XX  * X
+XX  X X
+X@  X X
+X*X * X
+X  .  X
+XXXXXXX
+XXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 8
+Size Y: 9
+
+
+
+XXXXXXXX
+XX *X@*X
+XX   * X
+XXXXX.*X
+XX     X
+XX  XXXX
+X   XXXX
+X   XXXX
+XXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 9
+Size Y: 7
+
+
+
+XXXXXXXXX
+X@  . XXX
+X *X   XX
+X  XX  XX
+XXX* X XX
+XXX    XX
+XXXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 8
+Size Y: 7
+
+
+
+XXXXXXXX
+X@*X  *X
+X  X   X
+X XXXX*X
+X   XX X
+XX *  .X
+XXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 6
+Size Y: 6
+
+
+
+XXXXXX
+X .XXX
+X  XXX
+X**XXX
+X@ XXX
+XXXXXX
+**************
+**************
+Maze: 
+
+Size X: 7
+Size Y: 7
+
+
+
+XXXXXXX
+XXXX .X
+XXXX  X
+XXXXX X
+XXX***X
+XXX.*@X
+XXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 9
+Size Y: 7
+
+
+
+XXXXXXXXX
+XX  XXXXX
+X@.* X  X
+X.*   * X
+XXXX. * X
+XXXX    X
+XXXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 7
+Size Y: 9
+
+
+
+XXXXXXX
+XXXX .X
+X  X  X
+X * X X
+XXX   X
+XX@   X
+XX  * X
+XX  XXX
+XXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 9
+Size Y: 9
+
+
+
+XXXXXXXXX
+XX@ X.  X
+XX *    X
+XXXX .*XX
+XXXXX * X
+XXXXX   X
+X *    XX
+X .   .XX
+XXXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 9
+Size Y: 7
+
+
+
+XXXXXXXXX
+XXXXXXXXX
+XXXXXXXXX
+X   XXXXX
+X X*. *@X
+X  .*.* X
+XXXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 8
+Size Y: 8
+
+
+
+XXXXXXXX
+XXXX@ .X
+XXXX*X*X
+X      X
+X  .  XX
+XX*   .X
+XX     X
+XXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 7
+Size Y: 7
+
+
+
+XXXXXXX
+XXXXXXX
+XX .XXX
+X * XXX
+X***XXX
+X@  XXX
+XXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 8
+Size Y: 6
+
+
+
+XXXXXXXX
+X   X.*X
+X   *. X
+XXX **XX
+XXXX@ XX
+XXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 9
+Size Y: 7
+
+
+
+XXXXXXXXX
+XXXXX   X
+XXXX *  X
+XXXX. *XX
+XX@    XX
+XX     XX
+XXXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 8
+Size Y: 9
+
+
+
+XXXXXXXX
+XX  X  X
+XX  *  X
+XX.   XX
+XXXX   X
+X@ X* .X
+X *    X
+XX. XXXX
+XXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 9
+Size Y: 7
+
+
+
+XXXXXXXXX
+X . XXXXX
+X       X
+XX XXXX*X
+X.** X@.X
+X.    * X
+XXXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 9
+Size Y: 7
+
+
+
+XXXXXXXXX
+XXXXXXXXX
+X@ XXXXXX
+X**X   XX
+X.X    XX
+X** X  XX
+XXXXXXXXX
+**************
+**************
+Maze: 
+
+Size X: 8
+Size Y: 6
+
+
+
+XXXXXXXX
+XX .XXXX
+XX  X .X
+XXX  **X
+XXX .*@X
+XXXXXXXX
+**************
