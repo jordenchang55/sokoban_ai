@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as funct
+import torch.nn.init as init
 from agent import Agent
 import numpy as np
 from collections import deque
@@ -27,8 +28,10 @@ class SokobanNet(nn.Module):
 
         self.fc1 = nn.Linear((4*(DeepQAgent.INPUT_SIZE-4)**2), 64) ##CHANGE TO 256 128
         self.fc_bn1 = nn.BatchNorm1d(64)
+        init.kaiming_normal(fc1)
 
         self.fc2 = nn.Linear(64, 32)
+        init.kaiming_normal(fc2)
         self.fc_bn2 = nn.BatchNorm1d(32)
 
         self.fc4 = nn.Linear(32, 4)
