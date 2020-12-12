@@ -87,16 +87,16 @@ class QAgent(Agent):
 
 		if goal_reach:
 			# logging.info("reward for finishing puzzle")
-			return 500.
+			return 1
 		elif push_on_goal:
-			return 50.
+			return 0.1
 		elif box_pushing:
-			return -0.5
+			return -0.001
 		elif self.environment.is_deadlock():
 			# logging.info("deadlock reward")
-			return -2
+			return -0.004
 		else:
-			return -1
+			return -0.002
 
 	def get_actions(self, state, sokoban_map):
 		'''
