@@ -144,9 +144,10 @@ def train():
 
     if args.command[1] == "deep":
         from deepqagent import DeepQAgent
-        environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
+        from deepenvironment import DeepEnvironment 
+        environment = DeepEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
 
-        agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
+        agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, quiet = args.quiet, verbose=args.verbose)
 
 
         if len(args.command) < 4:
@@ -164,16 +165,16 @@ def train():
 
     elif args.command[1] == "box":
         from boxagent import BoxAgent
-        from state_environment import StateEnvironment
+        from stateenvironment import StateEnvironment
 
         environment = StateEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
 
-        agent = BoxAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
+        agent = BoxAgent(environment = environment, discount_factor=0.95, quiet = args.quiet, verbose = args.verbose)
     elif args.command[1] == "q":
         from agent import QAgent
-        environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
+        environment = StateEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
 
-        agent = QAgent(environment = environment, discount_factor=0.95, verbose = args.verbose)
+        agent = QAgent(environment = environment, discount_factor=0.95, quiet = args.quiet, verbose = args.verbose)
 
     else: 
         raise ValueError("Unexpected agent.")
@@ -188,9 +189,12 @@ def train():
 
         goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
-        if agent.num_episodes > 0 and agent.num_episodes % 500 == 0:
-            goal_evaluated, iterations = agent.episode(draw = True, evaluate=True, max_iterations=200)
-
+        if args.command == "box":
+            if agent.num_episodes > 0 and agent.num_episodes % 500 == 0:
+                goal_evaluated, iterations = agent.episode(draw = args.draw, evaluate=True, max_iterations=200)
+        elif args.command == "deep":
+            if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
+                goal_evaluated, iterations = agent.episode(draw = args.draw, evaluate=True, max_iterations=200)
         if goal_evaluated:
             break
         #num_episodes += 1
@@ -251,8 +255,8 @@ def evaluate():
 
 def test():
     import unittest
-    import tests.state_environment_test
-
+    import tests.stateenvironmenttest
+    import tests.deepenvironmenttest
     import tests.deepqagenttest
 
     import logging
@@ -262,6 +266,7 @@ def test():
 
     suite.addTests(loader.loadTestsFromModule(tests.stateenvironmenttest))
     suite.addTests(loader.loadTestsFromModule(tests.deepqagenttest))
+    suite.addTests(loader.loadTestsFromModule(tests.deepenvironmenttest))
 
 
   

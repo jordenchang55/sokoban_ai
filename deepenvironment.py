@@ -108,13 +108,13 @@ class DeepEnvironment(Environment):
     def get_player(self, state):
         return np.unravel_index(np.argmax(state[0, :, :]), state[0, :, :].shape)
     def get_neighbors(self, location):
-        return [location + direction for direction in DIRECTIONS]
+        return [location + direction for direction in Environment.DIRECTIONS]
 
 
     def is_frozen(self, state, location, previous=None):
 
         if location.tobytes() in self.deadlock_table[self.state_hash]:
-          return self.deadlock_table[self.state_hash][location.tobytes()]
+            return self.deadlock_table[self.state_hash][location.tobytes()]
 
         # if not previous:
         #   previous = set([])

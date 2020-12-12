@@ -13,10 +13,30 @@ from environment import Environment
 class Agent():
     actions = [Environment.UP, Environment.RIGHT, Environment.DOWN, Environment.LEFT]
 
-    def __init__(self, environment, *args, **kwargs):
+    def __init__(self, environment, quiet, verbose):
         self.environment = environment
+        self.quiet = quiet
+        self.verbose = verbose and not quiet #quiet outweighs verbose
 
         self.print_threshold = 200
+
+        self.num_episodes = 0
+        self.num_iterations = 0
+
+
+    def verbose_print(self, string):
+        if self.verbose:
+            print(string)
+    def standard_print(self, string):
+        if not self.quiet:
+            print(string)
+
+    def episode_print(self, string=""):
+
+        self.verbose_print(f"{self.num_episodes:6d}.{self.num_iterations:5d}:{string}")
+
+
+
 
     def reward(self, state, action):
         raise NotImplementedError
@@ -274,7 +294,7 @@ class QAgent(Agent):
 
           #draw = True
 
-        num_iterations = 0
+        self.num_iterations = 0
         pstate_1 = None
         pstate_2 = None
         while not self.environment.is_goal() and not self.environment.is_deadlock() and num_iteartions < max_iterations:
@@ -298,15 +318,15 @@ class QAgent(Agent):
                 pstate_1 = np.copy(state)
                 
 
-            if num_iterations > 0 and num_iterations%self.print_threshold == 0:
-                print(f"     .{num_iterations:7d}:")
+            if self.num_iterations > 0 and self.num_iterations%self.print_threshold == 0:
+                print(f"     .{self.num_iterations:7d}:")
 
             action_sequence.append(action)
-            num_iterations += 1
+            self.num_iterations += 1
 
 
-        if num_iterations%self.print_threshold != 0:
-            print(f"     .{num_iterations:7d}:")
+        if self.num_iterations%self.print_threshold != 0:
+            print(f"     .{self.num_iterations:7d}:")
         # if self.environment.is_goal():
         #   self.experience_cache.append(action_sequence)
 
@@ -328,7 +348,7 @@ class QAgent(Agent):
                 print(f"iterations :{iterations}")
             print("-"*20)
 
-        return self.environment.is_goal(), num_iterations
+        return self.environment.is_goal(), self.num_iterations
 
 
 

@@ -44,3 +44,12 @@ class Environment:
         elif all(direction == Environment.LEFT):
             return "LEFT"
         return "RIGHT"
+
+    def rotate_direction_90(self, direction):
+        if all(direction == Environment.UP):
+            return Environment.RIGHT
+        elif all(direction == Environment.RIGHT):
+            return Environment.DOWN
+        elif all(direction == Environment.DOWN):
+            return Environment.LEFT
+        return Environment.UP

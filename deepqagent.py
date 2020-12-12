@@ -10,10 +10,8 @@ import time
 from pathlib import Path
 from torchvision import transforms
 class SokobanNet(nn.Module):
-    def __init__(self, xlim, ylim, dropout=0.5):
+    def __init__(self, dropout=0.5):
         super(SokobanNet, self).__init__()
-        self.xlim = xlim
-        self.ylim = ylim
         self.dropout = dropout
 
         channels = 4
@@ -27,13 +25,13 @@ class SokobanNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(channels)
         self.bn4 = nn.BatchNorm2d(channels)
 
-        self.fc1 = nn.Linear(4*(22*22), 256)
-        self.fc_bn1 = nn.BatchNorm1d(256)
+        self.fc1 = nn.Linear((4*(DeepQAgent.INPUT_SIZE-4)**2), 64) ##CHANGE TO 256 128
+        self.fc_bn1 = nn.BatchNorm1d(64)
 
-        self.fc2 = nn.Linear(256, 128)
-        self.fc_bn2 = nn.BatchNorm1d(128)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc_bn2 = nn.BatchNorm1d(32)
 
-        self.fc4 = nn.Linear(128, 4)
+        self.fc4 = nn.Linear(32, 4)
 
     def forward(self, s):
         #s = s.view()
@@ -43,7 +41,7 @@ class SokobanNet(nn.Module):
         s = funct.relu(self.bn2(self.conv2(s)))
         s = funct.relu(self.bn3(self.conv3(s)))
         s = funct.relu(self.bn4(self.conv4(s)))
-        s = s.view(-1, 4*(22*22))
+        s = s.view(-1, 4*((DeepQAgent.INPUT_SIZE-4)**2))
 
         assert torch.isnan(s).any() == False, print("NaN numbers in tensor.")
 
@@ -54,7 +52,7 @@ class SokobanNet(nn.Module):
 
         q = self.fc4(s)
 
-        return torch.tanh(q)
+        return q
 
 
 class ReplayBuffer:
@@ -78,25 +76,24 @@ class ReplayBuffer:
 
 class DeepQAgent(Agent):
 
+    INPUT_SIZE = 15
 
-
-    def __init__(self, environment, learning_rate=1e-4, discount_factor=0.95, greedy_rate=0.3, minibatch_size = 32, buffer_size = 100000, verbose=False):
-        super().__init__(environment)
+    def __init__(self, environment, learning_rate=1e-4, discount_factor=0.8, greedy_rate=0.3, minibatch_size = 32, buffer_size = 100000, quiet = False, verbose=False):
+        super().__init__(environment, quiet, verbose)
 
         self.discount_factor = discount_factor
         self.minibatch_size = minibatch_size
         self.buffer_size = buffer_size
         self.greedy_rate = greedy_rate
-        self.verbose = verbose
 
-        if self.environment.xlim > 25 or self.environment.ylim > 25:
+        if self.environment.xlim > DeepQAgent.INPUT_SIZE-1 or self.environment.ylim > DeepQAgent.INPUT_SIZE-1:
             raise ValueError("Map size too large for current DeepQAgent implementation.")
         else:
-            self.pad_config = [(0, 26-(self.environment.xlim+1)), (0, 26-(self.environment.ylim+1))]
+            self.pad_config = [(0, DeepQAgent.INPUT_SIZE-(self.environment.xlim+1)), (0, DeepQAgent.INPUT_SIZE-(self.environment.ylim+1))]
 
 
         #if torch.cuda.is_available():
-        self.model = SokobanNet(self.environment.xlim, self.environment.ylim)
+        self.model = SokobanNet()
         if torch.cuda.is_available():
             self.model.cuda()
             self.cuda_device = torch.device('cuda')
@@ -105,7 +102,7 @@ class DeepQAgent(Agent):
 
         #mse and sgd algorithm
         self.criterion = nn.MSELoss(reduction='sum').cuda() if self.cuda_device else nn.MSELoss(reduction='sum')
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
 
         #replay buffer. new per agent
         self.replay_buffer = ReplayBuffer(buffer_size = self.buffer_size)
@@ -121,12 +118,15 @@ class DeepQAgent(Agent):
         self.losses = []
 
         #internal record of number episodes run 
-        self.num_episodes = 0
         self.times_trained = 0
+        self.print_threshold = 10
+
+        self.boxes_scored = 0
+
 
     def load_environment(self, environment):
         self.environment = environment
-        self.pad_config = [(0, 26-(self.environment.xlim+1)), (0, 26-(self.environment.ylim+1))]
+        self.pad_config = [(0, DeepQAgent.INPUT_SIZE-(self.environment.xlim+1)), (0, DeepQAgent.INPUT_SIZE-(self.environment.ylim+1))]
 
 
     def reward(self, state, action):
@@ -155,22 +155,13 @@ class DeepQAgent(Agent):
 
         state_hash = state.tobytes()
         if goal_reach:
-            #print("reward for finishing puzzle")
             return 1.#500.
-        elif push_on_goal:
-            #next_state = self.next_state(state, action, sokoban_map)
-            #self.inspiration.append((copy.deepcopy(state), copy.deepcopy(self.environment.has_scored)))
+        elif push_on_goal and self.boxes_scored < self.environment.count_boxes_scored(self.next_state(state, action)):
             return 1.#. 
-        elif state_hash in self.environment.deadlock_table and any([self.environment.deadlock_table[state_hash][key] for key in self.environment.deadlock_table[state_hash]]):
-            #print('deadlock reward')
+        elif self.environment.is_deadlock(state):
             return -1.
-        # elif box_pushing:
-        #   return -0.5
-        # elif self.environment.is_deadlock():
-        #   #print("deadlock reward")
-        #   return -2
         else:
-            return -0.01
+            return 0
 
 
     def target(self, state, action):
@@ -200,7 +191,7 @@ class DeepQAgent(Agent):
 
         batch = np.pad(np.stack(samples, axis=0), [(0,0), (0,0), *self.pad_config])
 
-        tensor_state = torch.from_numpy(batch).view(-1, 4, 26, 26).float()
+        tensor_state = torch.from_numpy(batch).view(-1, 4, DeepQAgent.INPUT_SIZE, DeepQAgent.INPUT_SIZE).float()
         if self.cuda_device:
             tensor_state = tensor_state.contiguous().cuda()
         #print(tensor_state.size())
@@ -210,7 +201,8 @@ class DeepQAgent(Agent):
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples], device=self.cuda_device)
         else:
             y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
-        y = torch.tanh(y)
+        #y = torch.tanh(y)
+        #self.verbose_print(f"{y_pred}, {y}")
         self.model.train()
         
         loss = self.criterion(y_pred, y)
@@ -219,6 +211,7 @@ class DeepQAgent(Agent):
         loss.backward()
         self.optimizer.step()
 
+        self.episode_print(f"{loss.item():.4f}")
         self.running_loss += loss.item()
         self.times_trained += 1
 
@@ -226,7 +219,7 @@ class DeepQAgent(Agent):
 
     def predict(self, state):
         pad_state = np.pad(state, [(0,0), *self.pad_config])
-        tensor_state = torch.from_numpy(pad_state).view(1, 4, 26, 26).float()
+        tensor_state = torch.from_numpy(pad_state).view(1, 4, DeepQAgent.INPUT_SIZE, DeepQAgent.INPUT_SIZE).float()
         if self.cuda_device:
             tensor_state = tensor_state.contiguous().cuda()
         self.model.eval()
@@ -237,11 +230,11 @@ class DeepQAgent(Agent):
     def episode(self, draw = False, evaluate = False, max_iterations=5000):
         episode_start = time.process_time()
         self.num_episodes += 1
-        print(f"{self.num_episodes:5d}.{0:7d}:")
+        self.episode_print()
 
         state = np.copy(self.environment.state)
         self.training_times.append([])
-        num_iterations = 0
+        self.num_iterations = 0
 
         self.action_sequence = []
         self.q_sequence = []
@@ -251,7 +244,7 @@ class DeepQAgent(Agent):
 
         if draw:
             self.environment.draw(state)
-        while not self.environment.is_goal_state(state) and not self.environment.is_deadlock(state) and num_iterations < max_iterations:
+        while not self.environment.is_goal_state(state) and not self.environment.is_deadlock(state) and self.num_iterations < max_iterations:
             #tensor_state = torch.from_numpy(state).view(1, 4, 9, 9).float()
 
             
@@ -269,26 +262,34 @@ class DeepQAgent(Agent):
                     print(f"{qvalues}:")
                 self.q_sequence.append(np.array(torch.max(qvalues).cpu()))
                 chosen_action = self.actions[torch.argmax(qvalues)]
-                print(f"     .{num_iterations:7d}:{qvalues},{chosen_action}")
+                print(f"     .{self.num_iterations:7d}:{qvalues},{chosen_action}")
 
             self.action_sequence.append(chosen_action)
             state = self.environment.next_state(state, chosen_action)
 
-            self.replay_buffer.add(np.copy(state))
 
-            
+            symmetries = [np.copy(state)]
+            for k in range(1, 4):
+                symmetries.append(np.rot90(state, k, (1, 2)))
+
+            for symmetry in symmetries:
+                    self.replay_buffer.add(symmetry)
+
+            if self.boxes_scored < num_boxes_scored:
+                self.boxes_scored = num_boxes_scored
+
             if draw:
                 self.environment.draw(state)
 
 
-            if num_iterations > 0 and num_iterations%200 == 0:
-                print(f"     .{num_iterations:7d}:")
+            if self.num_iterations > 0 and self.num_iterations%self.print_threshold == 0:
+                self.episode_print()
 
 
-            num_iterations += 1
+            self.num_iterations += 1
             
-        if num_iterations%1000 != 0:
-            print(f"     .{num_iterations:7d}:")
+        if self.num_iterations%self.print_threshold != 0:
+            self.episode_print()
         goal_flag = self.environment.is_goal_state(state)
 
         if evaluate:
@@ -298,7 +299,7 @@ class DeepQAgent(Agent):
             print(f"evaluation :{goal_flag}")
             print(f"mean q(s,a):{qmean}")
             if goal_flag:
-                print(f"iterations :{num_iterations}")
+                print(f"iterations :{self.num_iterations}")
             print("-"*20)
 
 
@@ -306,9 +307,9 @@ class DeepQAgent(Agent):
             self.losses.append(self.running_loss/self.times_trained)
 
 
-        self.episode_times.append((num_iterations, time.process_time() - episode_start))
+        self.episode_times.append((self.num_iterations, time.process_time() - episode_start))
 
-        return goal_flag, num_iterations
+        return goal_flag, self.num_iterations
 
     def save_sequence(self, filename):
         with open(filename, 'w') as f:
