@@ -249,7 +249,7 @@ class DeepQAgent(Agent):
                 if len(self.replay_buffer) >= self.minibatch_size:
                     self.train()
 
-                if random.random() > self.greedy_rate:
+                if random.random() > self.get_greedy_rate():
                     chosen_action = random.choice(self.actions)
                 else:
                     chosen_action = self.actions[torch.argmax(self.predict(state))]
