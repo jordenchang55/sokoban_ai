@@ -18,6 +18,7 @@ class DeepEnvironment(Environment):
         self.ylim = ylim
 
         self.boxes = np.array(boxes)
+        self.num_boxes = len(boxes)
         #print(self.boxes)
 
         self.storage = set(storage)

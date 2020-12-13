@@ -34,7 +34,7 @@ def load(filename):
 
             def unpack(points):
 
-                return [tuple([int(points[index+1]), int(points[index])]) for index in range(1, len(points), 2)]
+                return [tuple([int(points[index+1]), int(points[index])]) for index in range(1, len(points)-1, 2)]
 
             #print(index, row)
 
@@ -59,8 +59,9 @@ def train_all():
     randomly train on the different maps for the given amount of episodes...
     '''
     from deepqagent import DeepQAgent
-    input_path = Path("inputs/*.txt")
-
+    input_path = Path(args.command[2])
+    if input_path.exists() and input_path.is_dir():
+        input_path.join_path('*')
     file_list = list(input_path.glob())
 
     max_episodes = abs(args.episodes)
@@ -68,9 +69,11 @@ def train_all():
 
     walls, boxes, storage, player, xlim, ylim = load(file_list[0])    
 
-    environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-    agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
-
+    if args.command[1] == "deep":
+        environment = DeepEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+        agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
+    else:
+        raise NotImplementedError
 
     if len(args.command) == 2:
         pretrain_path = Path("sokoban_state.pth")
@@ -79,9 +82,9 @@ def train_all():
         elif pretrain_path.exists() and not pretrain_path.is_file():
             raise ValueError("Invalid pytorch file.")
     else:
-        pretrain_path = Path(args.command[2])
+        pretrain_path = Path(args.command[3])
         if pretrain_path.exists() and pretrain_path.is_file():
-            agent.load(args.command[2])
+            agent.load(args.command[3])
         elif pretrain_path.exists() and not pretrain_path.is_file():
             raise ValueError("Invalid file input.")
 
@@ -90,11 +93,10 @@ def train_all():
 
         walls, boxes, storage, player, xlim, ylim = random.choice(file_list)  
 
-        environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+        environment = DeepEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
         agent.load_environment(environment)
 
-        num_iterations = 0
-        while num_iterations < 5000:
+        while agent.num_episodes < 5000:
 
 
             
@@ -189,10 +191,10 @@ def train():
 
         goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
-        if args.command == "box":
+        if args.command[1] == "box":
             if agent.num_episodes > 0 and agent.num_episodes % 500 == 0:
-                goal_evaluated, iterations = agent.episode(draw = args.draw, evaluate=True, max_iterations=200)
-        elif args.command == "deep":
+                goal_evaluated, iterations = agent.episode(draw = args.verbose, evaluate=True, max_iterations=200)
+        elif args.command[1] == "deep":
             if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
                 goal_evaluated, iterations = agent.episode(draw = args.draw, evaluate=True, max_iterations=200)
         if goal_evaluated:
