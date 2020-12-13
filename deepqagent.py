@@ -152,8 +152,10 @@ class DeepQAgent(Agent):
         state_hash = state.tobytes()
         if self.environment.is_goal_state(next_state):
             return 1.#500.
-        elif push_on_goal and self.boxes_scored < self.environment.count_boxes_scored(next_state):
+        elif push_on_goal:
             return 1.#. 
+        elif self.environment.count_boxes_scored(state) > self.environment.count_boxes_scored(next_state):
+            return -1.
         elif self.environment.is_deadlock(state):
             return -1.
         else:
