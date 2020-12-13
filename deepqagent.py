@@ -26,15 +26,15 @@ class SokobanNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(channels)
         self.bn4 = nn.BatchNorm2d(channels)
 
-        self.fc1 = nn.Linear((4*(DeepQAgent.INPUT_SIZE-4)**2), 64) ##CHANGE TO 256 128
-        self.fc_bn1 = nn.BatchNorm1d(64)
+        self.fc1 = nn.Linear((4*(DeepQAgent.INPUT_SIZE-4)**2), 256) ##CHANGE TO 256 128
+        self.fc_bn1 = nn.BatchNorm1d(256)
         init.kaiming_normal_(self.fc1.weight)
 
-        self.fc2 = nn.Linear(64, 32)
+        self.fc2 = nn.Linear(256, 128)
         init.kaiming_normal_(self.fc2.weight)
-        self.fc_bn2 = nn.BatchNorm1d(32)
+        self.fc_bn2 = nn.BatchNorm1d(128)
 
-        self.fc4 = nn.Linear(32, 4)
+        self.fc4 = nn.Linear(128, 4)
 
     def forward(self, s):
         #s = s.view()
@@ -143,23 +143,12 @@ class DeepQAgent(Agent):
         # for i in range(len(self.environment.state[2:])):
         #   if (box_position == self.environment.state[2+i]).all():
         #       not_scored = not self.environment.has_scored[i]
-
-
-
-        goal_reach = all([state[1, place[0], place[1]] == 1 for place in self.environment.storage])
-        if push_on_goal:
-            goal_reach = True
-            set_difference = self.environment.storage.difference({tuple(next_box_position)})
-            for place in set_difference:
-                if state[1, place[0], place[1]] == 0:
-                    goal_reach = False
-        else:
-            goal_reach = False
+        next_state  = self.environment.next_state(state, action)
 
         state_hash = state.tobytes()
-        if goal_reach:
+        if self.environment.is_goal_state(next_state):
             return 1.#500.
-        elif push_on_goal and self.boxes_scored < self.environment.count_boxes_scored(self.environment.next_state(state, action)):
+        elif push_on_goal and self.boxes_scored < self.environment.count_boxes_scored(next_state):
             return 1.#. 
         elif self.environment.is_deadlock(state):
             return -1.
@@ -214,7 +203,7 @@ class DeepQAgent(Agent):
         loss.backward()
         self.optimizer.step()
 
-        self.episode_print(f"{loss.item():.4f}")
+        #self.episode_print(f"{loss.item():.4f}")
         self.running_loss += loss.item()
         self.times_trained += 1
 
@@ -309,6 +298,7 @@ class DeepQAgent(Agent):
 
         if self.times_trained != 0:
             self.losses.append(self.running_loss/self.times_trained)
+            episode_print(f"loss:{self.running_loss/self.times_trained:.3f}")
 
 
         self.episode_times.append((self.num_iterations, time.process_time() - episode_start))

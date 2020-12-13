@@ -352,7 +352,8 @@ class BoxAgent(Agent):
 
 
     def episode(self, draw=False, evaluate=False, max_iterations=8000):
-        action_sequence = []
+        box_action_sequence = []
+        action_seqeuence = []
         self.q_sequence = []
         self.num_episodes += 1
         self.num_iterations = 0 
@@ -404,8 +405,10 @@ class BoxAgent(Agent):
             if path:
                 for path_action in path:
                     state = self.environment.next_state(state, path_action)
+                    action_sequence.append(path_action)
 
             state = self.environment.next_state(state, action)
+            action.sequence.append(action)
 
             num_boxes_scored = self.environment.count_boxes_scored(state)
             if self.boxes_scored < num_boxes_scored:
@@ -421,7 +424,7 @@ class BoxAgent(Agent):
             if draw:
                 self.environment.draw(state)
 
-            action_sequence.append(box_action)
+            box_action_sequence.append(box_action)
             self.num_iterations += 1
 
         goal_flag = self.environment.is_goal_state(state)
@@ -447,8 +450,8 @@ class BoxAgent(Agent):
 
             if qmean > 500:
                 self.draw = True
-                self.replay(action_sequence,    update = False)
+                self.replay(box_action_sequence,    update = False)
 
         self.draw = False
 
-        return goal_flag, self.num_iterations#, action_sequence
+        return goal_flag, self.num_iterations, action_sequence

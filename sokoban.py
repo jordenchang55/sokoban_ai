@@ -60,9 +60,9 @@ def train_all():
     '''
     from deepqagent import DeepQAgent
     input_path = Path(args.command[2])
-    if input_path.exists() and input_path.is_dir():
-        input_path.join_path('*')
-    file_list = list(input_path.glob())
+    if input_path.exists() and not input_path.is_dir():
+        raise ValueError("Should be directory.")
+    file_list = list(input_path.glob('*'))
 
     max_episodes = abs(args.episodes)
     max_iterations = abs(args.iterations)
@@ -70,6 +70,8 @@ def train_all():
     walls, boxes, storage, player, xlim, ylim = load(file_list[0])    
 
     if args.command[1] == "deep":
+        from deepenvironment import DeepEnvironment
+        from deepqagent import DeepQAgent
         environment = DeepEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
         agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
     else:
@@ -88,29 +90,37 @@ def train_all():
         elif pretrain_path.exists() and not pretrain_path.is_file():
             raise ValueError("Invalid file input.")
 
-
-    while agent.num_episodes < max_episodes:
-
-        walls, boxes, storage, player, xlim, ylim = random.choice(file_list)  
-
+    epochs = 0
+    max_epochs = 5000
+    while epochs < max_epochs:
+        file = random.choice(file_list) 
+        walls, boxes, storage, player, xlim, ylim =  load(file)
+        if args.verbose:
+            print(f"epoch {epochs}:{file} of size {xlim}, {ylim}.")
         environment = DeepEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
         agent.load_environment(environment)
 
-        while agent.num_episodes < 5000:
+
+        while True:
+
+            goal, iterations = agent.episode(draw = False, evaluate = False, max_iterations = max_iterations)
 
 
-            
-            goal, iterations = agent.episode(args = False, evaluate = False, max_iterations = max_iterations)
-
-            num_iterations += iterations
+            if agent.num_episodes % 100:
+                goal, iterations = agent.episode(draw = False, evaluate = True, max_iterations = 200)
+                if goal:
+                    break
 
         if len(args.command) == 3:
-            agent.save(args.command[2])
+            agent.save(args.command[3])
         else:
             agent.save("sokoban_state.pth")
 
+        epoch += 1
+
+
     if len(args.command) == 3:
-            agent.save(args.command[2])
+            agent.save(args.command[3])
     else:
         agent.save("sokoban_state.pth")
 
