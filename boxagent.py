@@ -31,7 +31,7 @@ class Node:
         return next(self.data)
 
 class BoxAgent(Agent):
-    def __init__(self, environment, discount_factor = 0.8, replay_rate = 0.2, quiet = False, verbose = False):
+    def __init__(self, environment, discount_factor = 1.0, replay_rate = 0.2, quiet = False, verbose = False):
         #super()
         super().__init__(environment, quiet, verbose)
 
@@ -57,7 +57,7 @@ class BoxAgent(Agent):
 
 
     def encode(self, state, action):
-        return (state.boxes.tobytes(), action.tobytes())
+        return (state.boxes.tobytes(), state.max_score, action.tobytes())
 
     def reward(self, state, action):
         box, box_action = action
@@ -65,24 +65,16 @@ class BoxAgent(Agent):
         next_box_position = box + box_action
 
         push_on_goal = (tuple(next_box_position) in state.storage)
-        #print(f"push_on_goal:{push_on_goal}, num_scored:{self.environment.count_boxes_scored(self.next_state(state, action))}")
+    
 
-        goal_reach = all([state.map[place] == State.BOX for place in state.storage])
-        if push_on_goal:
-            goal_reach = True
-            set_difference = state.storage.difference({tuple(next_box_position)})
-            for place in set_difference:
-                if state.map[place] != State.BOX:
-                    goal_reach = False
-        else:
-            goal_reach = False
-
-
-        #state_hash = state.tobytes()
-        if goal_reach:
+        next_state = self.next_state(state, action)
+        # if push_on_goal:
+        #     print(next_state.max_score)
+        if self.environment.is_goal_state(next_state):
             return 500.
-        elif push_on_goal and self.boxes_scored < self.environment.count_boxes_scored(self.next_state(state, action)):
-            return 50.#. 
+        elif push_on_goal and state.max_score < next_state.max_score:
+            #print("reward")
+            return 50
         elif self.environment.is_deadlock(state):
             return -2.
         else:
@@ -94,7 +86,7 @@ class BoxAgent(Agent):
 
     
 
-    def astar(self, state, destination):
+    def search(self, state, destination):
         pqueue = PriorityQueue()
         
         if self.verbose and self.draw:
@@ -119,7 +111,7 @@ class BoxAgent(Agent):
                 plt.show(block=False)
                 plt.pause(0.01)
 
-            path_cost, position, prev_path = pqueue.get()
+            cost, position, prev_path = pqueue.get()
 
 
             if (position == destination).all():
@@ -133,9 +125,10 @@ class BoxAgent(Agent):
                     ##if empty
                     visited.add(neighbor.tobytes())
 
-                    f = path_cost - np.linalg.norm(position-destination) + np.linalg.norm(neighbor - destination) + 1. #edge cost is 1
-
-                    pqueue.put(Node(f, neighbor, prev_path[:] + [action]))
+                    #f = cost - np.linalg.norm(position-destination) + np.linalg.norm(neighbor - destination) + 1. #edge cost is 1
+                    
+                    h = np.linalg.norm(neighbor - destination) #dfs, slightly faster for euclidian spaces
+                    pqueue.put(Node(h, neighbor, prev_path[:] + [action]))
 
 
         if (position == destination).all():
@@ -151,7 +144,7 @@ class BoxAgent(Agent):
         if path_hash in self.path_table:
             return self.path_table[path_hash]
 
-        path = self.astar(state, next_location)
+        path = self.search(state, next_location)
 
         self.path_table[self.path_encoding(state, next_location)] = path
 
@@ -214,10 +207,10 @@ class BoxAgent(Agent):
         # else:
         #     return 0
 
-        if self.num_episodes > 100000:
+        if self.num_episodes > 50000:
             return 0.8
         else:
-            return 0.8*self.num_episodes/100000
+            return 0.8*self.num_episodes/50000
         #return 0.3
 
 
@@ -243,6 +236,12 @@ class BoxAgent(Agent):
             if (next_state.boxes[index] == box).all():
                 next_state.boxes[index] = next_position
                 break
+
+        if tuple(next_position) in next_state.storage:
+            score = self.environment.count_boxes_scored(next_state)
+            if next_state.max_score < score:
+                next_state.max_score = score
+
 
         # for box in next_state.boxes:
         #     assert next_state.map[tuple(box)] == State.BOX, "boxes misaligned with map."
@@ -311,7 +310,7 @@ class BoxAgent(Agent):
             
             next_state = self.next_state(state, possible_action)
 
-            self.episode_print(f"{self.environment.direction_to_str(possible_action[1])}={self.q_table[self.encode(state, possible_action)]:.4f}, goal={self.environment.is_goal_state(next_state)}, box_count={self.environment.count_boxes_scored(next_state)}")
+            self.episode_print(f"{self.environment.direction_to_str(possible_action[1])}={self.q_table[self.encode(state, possible_action)]:.4f}, reward={self.reward(state, possible_action)}, goal={self.environment.is_goal_state(next_state)}, box_count={self.environment.count_boxes_scored(next_state)}")
 
             if chosen_action is None:
                 chosen_action = possible_action
@@ -419,14 +418,15 @@ class BoxAgent(Agent):
             if self.num_iterations > 0 and self.num_iterations%self.print_threshold == 0:
                 self.episode_print()
                 
-
+            if draw:
+                self.environment.draw(state)
 
             action_sequence.append(box_action)
             self.num_iterations += 1
 
         goal_flag = self.environment.is_goal_state(state)
 
-        if self.environment.count_boxes_scored(state) > 0:
+        if not evaluate and self.environment.count_boxes_scored(state) > 0:
             self.replay(action_sequence)
         if self.num_iterations%self.print_threshold != 0:
             self.episode_print(f"goal={goal_flag}")

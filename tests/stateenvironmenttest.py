@@ -2,28 +2,26 @@
 
 import unittest
 import numpy as np
+from stateenvironment import StateEnvironment
 from environment import Environment
-from environment import DOWN
-from environment import RIGHT
-from environment import LEFT
-from environment import UP
+from stateenvironment   import State   
 import copy
 import logging
 from sokoban import load
-class EnvironmentTest(unittest.TestCase):
+class StateEnvironmentTest(unittest.TestCase):
 
     def setUp(self):
 
         walls, boxes, storage, player, xlim, ylim = load('inputs/sokoban01.txt')
-        self.environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+        self.environment = StateEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
 
-        self.deadlock_sequence = [LEFT, DOWN, LEFT, LEFT, LEFT]
-        self.goal_sequence = [LEFT, DOWN, LEFT, LEFT, RIGHT, DOWN, RIGHT, DOWN, DOWN, LEFT, LEFT, LEFT, UP, LEFT, DOWN, RIGHT, UP, UP, UP, UP, LEFT, UP, RIGHT]
+        self.deadlock_sequence = [Environment.LEFT, Environment.DOWN, Environment.LEFT, Environment.LEFT, Environment.LEFT]
+        self.goal_sequence = [Environment.LEFT, Environment.DOWN, Environment.LEFT, Environment.LEFT, Environment.RIGHT, Environment.DOWN, Environment.RIGHT, Environment.DOWN, Environment.DOWN, Environment.LEFT, Environment.LEFT, Environment.LEFT, Environment.UP, Environment.LEFT, Environment.DOWN, Environment.RIGHT, Environment.UP, Environment.UP, Environment.UP, Environment.UP, Environment.LEFT, Environment.UP, Environment.RIGHT]
 
     def test_init(self):
 
-        self.assertEquals(self.environment.state[0, 7, 7], 1, msg=f"State does not reflect player's position.")
-        self.assertEquals(self.environment.state.shape, (4, 9, 9))
+        self.assertEquals(self.environment.state.map[7, 7], State.PLAYER, msg=f"State does not reflect player's position.")
+        self.assertEquals(self.environment.state.map.shape, (9, 9))
 
 
         player = self.environment.get_player(self.environment.state)
@@ -54,11 +52,11 @@ class EnvironmentTest(unittest.TestCase):
 
         original_state = copy.deepcopy(self.environment.state)
 
-        next_state = self.environment.next_state(self.environment.state, UP)
+        next_state = self.environment.next_state(self.environment.state, Environment.UP)
         self.assertTrue((original_state == self.environment.state).all(), msg="given parameter has been altered.")
         self.assertTrue((original_state == next_state).all(), msg="next_state is not the same as original_state.")
 
-        next_state = self.environment.next_state(self.environment.state, DOWN)
+        next_state = self.environment.next_state(self.environment.state, Environment.DOWN)
 
         self.assertTrue(next_state[0, 7, 6], msg="New position does not contain player.")
         self.assertFalse(next_state[0, 7, 7], msg="Old position is not empty.")
@@ -91,6 +89,23 @@ class EnvironmentTest(unittest.TestCase):
             else:
                 self.assertTrue(self.environment.is_deadlock(current_state), msg="Should be in deadlock, but is_deadlock() reutrns false.")
 
+        walls, boxes, storage, player, xlim, ylim = load('inputs/sokoban34.txt')
+        self.environment = Environment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
+
+        current_state = copy.deepcopy(self.environment.state)
+
+        current_state = self.environment.next_state(current_state, Environment.RIGHT)
+        self.environment.pause = 2
+        self.environment.draw(current_state)
+        import matplotlib.pyplot as plt 
+       
+        self.assertFalse(self.environment.is_deadlock(current_state), msg="Should not be in deadlock in this state.")
+        current_state = self.environment.next_state(current_state, Environment.DOWN)
+        current_state = self.environment.next_state(current_state, Environment.RIGHT)
+
+        self.assertFalse(self.environment.is_deadlock(current_state), msg="Should not be in deadlock in this state.")
+
+        self.environment.draw(current_state)
 
     def test_is_valid(self):
         for i in range(10):

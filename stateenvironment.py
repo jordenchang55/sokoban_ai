@@ -25,6 +25,9 @@ class State():
         self.storage = set(storage)
         self.boxes = np.array(boxes)
 
+        self.max_score = 0
+
+
     def __hash__(self):
         return self.state.map.tobytes()
 
@@ -50,7 +53,7 @@ class StateEnvironment(Environment):
         self.cache_miss = 0
         self.cache_hit = 0
 
-        #self.draw(self.state)
+        
 
 
     def reset(self):
@@ -160,14 +163,17 @@ class StateEnvironment(Environment):
             self.deadlock_table[self.state_hash] = {}
         else:
             self.cache_hit += 1
+
+        frozen_count = 0
         for box in state.boxes:
             if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
-                return True
+                frozen_count += 1
             elif self.is_frozen(state, box, previous=set([])):
-                return True
+                frozen_count += 1
 
 
-        #self.frozen_nodes = None
+        if len(state.boxes) - frozen_count < len(state.storage):
+            return True
         return False
 
 
@@ -206,9 +212,9 @@ class StateEnvironment(Environment):
             next_state.player = next_position
             #return next_position
 
-#         self.state[1,0] = np.sum(self.has_scored)
-        # for box in state.boxes:
-        #     assert state.map[tuple(box)] == State.BOX, "boxes misaligned with map."
+        score_count = self.count_boxes_scored(next_state)
+        if next_state.max_score < score_count:
+            next_state.max_score = score_count   
 
         return next_state
 
