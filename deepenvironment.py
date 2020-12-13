@@ -185,15 +185,18 @@ class DeepEnvironment(Environment):
             self.deadlock_table[self.state_hash] = {}
         else:
             self.cache_hit += 1
+
+        frozen_count = 0
         for i in range(self.xlim+1):
             for j in range(self.ylim+1):
                 box = np.array([i,j])
                 if state[1, i, j] == 1:
                     if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
-                        return True
+                        frozen_count += 1
                     elif self.is_frozen(state, box, previous=set([])):
-                        return True
-
+                        frozen_count += 1
+        if self.num_boxes - frozen_count < len(self.storage):
+            return True
 
         #self.frozen_nodes = None
         return False

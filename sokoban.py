@@ -73,7 +73,7 @@ def train_all():
         from deepenvironment import DeepEnvironment
         from deepqagent import DeepQAgent
         environment = DeepEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
-        agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.95, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
+        agent = DeepQAgent(environment = environment, learning_rate=args.learning_rate, discount_factor=0.90, minibatch_size = args.minibatch_size, buffer_size = args.buffer_size, verbose=args.verbose)
     else:
         raise NotImplementedError
 
@@ -103,11 +103,11 @@ def train_all():
 
         while True:
 
-            goal, iterations = agent.episode(draw = False, evaluate = False, max_iterations = max_iterations)
+            goal, iterations = agent.episode(draw = args.draw, evaluate = False, max_iterations = max_iterations)
 
 
-            if agent.num_episodes % 100:
-                goal, iterations = agent.episode(draw = False, evaluate = True, max_iterations = 200)
+            if agent.num_episodes % 100 == 0:
+                goal, iterations = agent.episode(draw = args.draw, evaluate = True, max_iterations = 200)
                 if goal:
                     break
 
@@ -116,7 +116,7 @@ def train_all():
         else:
             agent.save("sokoban_state.pth")
 
-        epoch += 1
+        epochs += 1
 
 
     if len(args.command) == 3:
@@ -181,7 +181,7 @@ def train():
 
         environment = StateEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)
 
-        agent = BoxAgent(environment = environment, discount_factor=0.95, quiet = args.quiet, verbose = args.verbose)
+        agent = BoxAgent(environment = environment, discount_factor=0.90, quiet = args.quiet, verbose = args.verbose)
     elif args.command[1] == "q":
         from agent import QAgent
         environment = StateEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim, pause=args.pause)

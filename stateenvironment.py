@@ -91,7 +91,7 @@ class StateEnvironment(Environment):
     def is_frozen(self, state, location, previous=None):
 
         if location.tobytes() in self.deadlock_table[self.state_hash]:
-          return self.deadlock_table[self.state_hash][location.tobytes()]
+            return self.deadlock_table[self.state_hash][location.tobytes()]
 
 
         neighbors = self.get_neighbors(location)
@@ -213,7 +213,7 @@ class StateEnvironment(Environment):
             #return next_position
 
         score_count = self.count_boxes_scored(next_state)
-        if next_state.max_score < score_count:
+        if next_state.       < score_count:
             next_state.max_score = score_count   
 
         return next_state

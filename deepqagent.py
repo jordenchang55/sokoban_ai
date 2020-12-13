@@ -122,7 +122,7 @@ class DeepQAgent(Agent):
 
         #internal record of number episodes run 
         self.times_trained = 0
-        self.print_threshold = 10
+        self.print_threshold = 50
 
         self.boxes_scored = 0
 
@@ -180,8 +180,9 @@ class DeepQAgent(Agent):
 
         samples = self.replay_buffer.sample(self.minibatch_size)
         
-
-        batch = np.pad(np.stack(samples, axis=0), [(0,0), (0,0), *self.pad_config])
+        states, targets = zip(*samples)
+        #print(len(states))
+        batch = np.stack(states, axis=0)
 
         tensor_state = torch.from_numpy(batch).view(-1, 4, DeepQAgent.INPUT_SIZE, DeepQAgent.INPUT_SIZE).float()
         if self.cuda_device:
@@ -190,9 +191,9 @@ class DeepQAgent(Agent):
 
         y_pred = self.model(tensor_state)
         if self.cuda_device:
-            y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples], device=self.cuda_device)
+            y = torch.tensor(targets, device=self.cuda_device)
         else:
-            y = torch.tensor([[self.target(state, action) for action in self.actions] for state in samples])
+            y = torch.tensor(targets)
         #y = torch.tanh(y)
         #self.verbose_print(f"{y_pred}, {y}")
         self.model.train()
@@ -250,22 +251,31 @@ class DeepQAgent(Agent):
                     chosen_action = self.actions[torch.argmax(self.predict(state))]
             else:
                 qvalues = self.predict(state)
-                if self.verbose:
-                    print(f"{qvalues}:")
+                #if self.verbose:
+                    #print(f"{qvalues}:")
                 self.q_sequence.append(np.array(torch.max(qvalues).cpu()))
                 chosen_action = self.actions[torch.argmax(qvalues)]
-                print(f"     .{self.num_iterations:7d}:{qvalues},{chosen_action}")
+                #print(f"     .{self.num_iterations:7d}:{qvalues},{chosen_action}")
 
             self.action_sequence.append(chosen_action)
             state = self.environment.next_state(state, chosen_action)
 
-
-            symmetries = [np.copy(state)]
+            #[UP RIGHT DOWN LEFT], [RIGHT DOWN LEFT UP], [DOWN, LEFT UP RIGHT] LEFT UP RIGHT DOWN]
+            rotate = [np.pad(state, [(0,0), *self.pad_config])]
             for k in range(1, 4):
-                symmetries.append(np.rot90(state, k, (1, 2)))
+                rotate.append(np.rot90(rotate[0], k, (1, 2)))
+            targets = [self.target(state, action) for action in self.actions]
+            self.replay_buffer.add((rotate[0], targets.copy()))
+            targets.append(targets.pop(0))
+            self.replay_buffer.add((rotate[1], targets.copy()))
+            targets.append(targets.pop(0))
 
-            for symmetry in symmetries:
-                    self.replay_buffer.add(symmetry)
+            self.replay_buffer.add((rotate[2], targets.copy()))
+            targets.append(targets.pop(0))
+            self.replay_buffer.add((rotate[3], targets.copy())) ##all symmetries
+
+
+
 
             num_boxes_scored = self.environment.count_boxes_scored(state)
             if self.boxes_scored < num_boxes_scored:
@@ -290,7 +300,7 @@ class DeepQAgent(Agent):
             qmean = qvalues.mean()
             print("-"*20)
             print(f"evaluation :{goal_flag}")
-            print(f"mean q(s,a):{qmean}")
+            print(f"mean q(s,a):{qmean:.3f}")
             if goal_flag:
                 print(f"iterations :{self.num_iterations}")
             print("-"*20)
@@ -298,7 +308,7 @@ class DeepQAgent(Agent):
 
         if self.times_trained != 0:
             self.losses.append(self.running_loss/self.times_trained)
-            episode_print(f"loss:{self.running_loss/self.times_trained:.3f}")
+            self.episode_print(f"loss:{self.running_loss/self.times_trained:.3f}")
 
 
         self.episode_times.append((self.num_iterations, time.process_time() - episode_start))
