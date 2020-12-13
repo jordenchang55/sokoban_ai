@@ -81,13 +81,12 @@ class DeepQAgent(Agent):
 
     INPUT_SIZE = 15
 
-    def __init__(self, environment, learning_rate=1e-4, discount_factor=0.8, greedy_rate=0.3, minibatch_size = 32, buffer_size = 100000, quiet = False, verbose=False):
+    def __init__(self, environment, learning_rate=1e-6, discount_factor=0.8, minibatch_size = 32, buffer_size = 5000000, quiet = False, verbose=False):
         super().__init__(environment, quiet, verbose)
 
         self.discount_factor = discount_factor
         self.minibatch_size = minibatch_size
         self.buffer_size = buffer_size
-        self.greedy_rate = greedy_rate
 
         if self.environment.xlim > DeepQAgent.INPUT_SIZE-1 or self.environment.ylim > DeepQAgent.INPUT_SIZE-1:
             raise ValueError("Map size too large for current DeepQAgent implementation.")
@@ -126,6 +125,11 @@ class DeepQAgent(Agent):
 
         self.boxes_scored = 0
 
+
+    def get_greedy_rate(self):
+        if self.num_episodes < 1000000:
+            return 0.8*self.num_episodes/(1000000)
+        return 0.8
 
     def load_environment(self, environment):
         self.environment = environment
