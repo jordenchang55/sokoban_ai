@@ -1,5 +1,8 @@
 import argparse
 
+import os
+
+
 def parse_map(file):
 	maps = []
 	with open(file, 'r') as f:
@@ -43,6 +46,8 @@ def parse_map(file):
 
 def save_map(maps, prefix, output):
 	i = 1
+	if not os.path.exists(output) or not os.path.isdir(output):
+		os.mkdir(output)
 	for m in maps:
 		with open('%s/%s%02d.txt' % (output, prefix, i), 'w') as f:
 			f.writelines([
