@@ -269,24 +269,37 @@ def test():
 
 def draw():
 	from stateenvironment import StateEnvironment
+
 	if len(args.command) < 2:
 		raise Exception("Expected a filepath argument.")
 
-	walls, boxes, storage, player, xlim, ylim = load(args.command[1])
-	environment = StateEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
+	def draw_file(filename):
+		walls, boxes, storage, player, xlim, ylim = load(filename)
+		environment = StateEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
 
-	environment.draw(environment.state)
-	for action in [
-		Environment.LEFT,
-		Environment.DOWN,
-		Environment.LEFT,
-		Environment.LEFT,
-		Environment.RIGHT,
-		Environment.DOWN
-	]:
-		environment.state = environment.next_state(environment.state, action)
 		environment.draw(environment.state)
-	plt.show(block=True)
+		# for action in [
+		# 	Environment.LEFT,
+		# 	Environment.DOWN,
+		# 	Environment.LEFT,
+		# 	Environment.LEFT,
+		# 	Environment.RIGHT,
+		# 	Environment.DOWN
+		# ]:
+		# 	environment.state = environment.next_state(environment.state, action)
+		# 	environment.draw(environment.state)
+		plt.show()
+		plt.pause(5)
+
+	if args.all:
+		input_path = Path(args.command[1])
+		if input_path.exists() and not input_path.is_dir():
+			raise ValueError("Should be directory.")
+		file_list = list(input_path.glob('*'))
+		for f in file_list:
+			draw_file(f)
+	else:
+		draw_file(args.command[1])
 
 
 # if args.sequence:
