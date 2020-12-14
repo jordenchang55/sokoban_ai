@@ -97,7 +97,7 @@ def train_all():
         file = random.choice(file_list) 
         walls, boxes, storage, player, xlim, ylim =  load(file)
 
-        while max_epochs < 5 and (xlim >= 9 or ylim >= 9):
+        while epochs < 5 and (xlim >= 9 or ylim >= 9):
             file = random.choice(file_list) 
             walls, boxes, storage, player, xlim, ylim =  load(file)
 
@@ -109,11 +109,11 @@ def train_all():
 
         while True:
 
-            goal, iterations = agent.episode(draw = args.draw, evaluate = False, max_iterations = max_iterations)
+            goal, iterations, actions = agent.episode(draw = args.draw, evaluate = False, max_iterations = max_iterations)
 
 
             if agent.num_episodes % 100 == 0:
-                goal, iterations = agent.episode(draw = args.draw, evaluate = True, max_iterations = 200)
+                goal, iterations, actions = agent.episode(draw = args.draw, evaluate = True, max_iterations = 200)
                 if goal:
                     break
 

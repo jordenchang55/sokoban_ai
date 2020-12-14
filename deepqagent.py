@@ -275,12 +275,12 @@ class DeepQAgent(Agent):
             targets = [self.target(state, action) for action in self.actions]
             self.replay_buffer.add((rotate[0], targets))
             targets.append(targets.pop(0))
-            self.replay_buffer.add((rotate[1], np.roll(targets, -1)))
+            self.replay_buffer.add((rotate[1], targets))
             targets.append(targets.pop(0))
 
-            self.replay_buffer.add((rotate[2], np.roll(targets, -2)))
+            self.replay_buffer.add((rotate[2], targets))
             targets.append(targets.pop(0))
-            self.replay_buffer.add((rotate[3], np.roll(targets, -3))) ##all symmetries
+            self.replay_buffer.add((rotate[3], targets)) ##all symmetries
 
 
 
