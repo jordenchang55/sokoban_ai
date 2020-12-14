@@ -31,7 +31,7 @@ class Node:
         return next(self.data)
 
 class BoxAgent(Agent):
-    def __init__(self, environment, discount_factor = 1.0, replay_rate = 0.2, quiet = False, verbose = False):
+    def __init__(self, environment, discount_factor = 0.90, replay_rate = 0.2, quiet = False, verbose = False):
         #super()
         super().__init__(environment, quiet, verbose)
 
@@ -125,15 +125,14 @@ class BoxAgent(Agent):
                     ##if empty
                     visited.add(neighbor.tobytes())
 
-                    #f = cost - np.linalg.norm(position-destination) + np.linalg.norm(neighbor - destination) + 1. #edge cost is 1
+                    f = cost - np.linalg.norm(position-destination) + np.linalg.norm(neighbor - destination) + 1. #edge cost is 1
                     
-                    h = np.linalg.norm(neighbor - destination) #dfs, slightly faster for euclidian spaces
-                    pqueue.put(Node(h, neighbor, prev_path[:] + [action]))
+                    #h = np.linalg.norm(neighbor - destination) #dfs, slightly faster for euclidian spaces
+                    pqueue.put(Node(f, neighbor, prev_path.copy() + [action]))
 
 
         if (position == destination).all():
-            return prev_path[:]
-            
+            return prev_path            
         return None
 
     def find_path(self, state, next_location):
@@ -146,7 +145,7 @@ class BoxAgent(Agent):
 
         path = self.search(state, next_location)
 
-        self.path_table[self.path_encoding(state, next_location)] = path
+        self.path_table[path_hash] = path
 
         return path
 
@@ -156,7 +155,7 @@ class BoxAgent(Agent):
             self.environment.draw(state)
 
 
-        ax = plt.gca()
+        #ax = plt.gca()
         possible_actions = []
         for box in state.boxes:
             #print(box)
@@ -223,12 +222,11 @@ class BoxAgent(Agent):
 
         next_state = copy.deepcopy(state)
         next_position = box + box_action
-
-        if state.map[tuple(next_position)] > State.PLAYER:
-            self.environment.draw(state)
-            print(next_position)
-            plt.show(block=True)
-            assert state.map[tuple(next_position)] <= State.PLAYER, "place should be empty"
+        # if state.map[tuple(next_position)] > State.PLAYER:
+        #     self.environment.draw(state)
+        #     print(next_position)
+        #     plt.show(block=True)
+        #     assert state.map[tuple(next_position)] <= State.PLAYER, "place should be empty"
         next_state.map[tuple(box)] = State.EMPTY
         next_state.map[tuple(next_position)] = State.BOX
 
@@ -251,26 +249,30 @@ class BoxAgent(Agent):
 
     def update(self, state, action):
         #print(action)
-        if self.encode(state, action) not in self.q_table:
-            self.q_table[self.encode(state, action)] = 1. 
+        q_hash = self.encode(state, action)
+        if q_hash not in self.q_table:
+            self.q_table[q_hash] = 1. 
 
         next_state = self.next_state(state, action)
 
         if not self.environment.is_goal_state(next_state):
             next_actions = self.get_actions(next_state)
-            for possible_action in next_actions:
-                if self.encode(next_state, possible_action) not in self.q_table:
-                    self.q_table[self.encode(next_state, possible_action)] = 1.
+
+            hashes = [self.encode(next_state, possible_action) for possible_action in next_actions]
+
+            for item in hashes:
+                if item not in self.q_table:
+                    self.q_table[item] = 1.
 
             if next_actions:
-                qmax = np.amax(np.array([self.q_table[self.encode(next_state, possible_action)] for possible_action in next_actions]))
+                qmax = np.amax(np.array([self.q_table[item] for item in hashes]))
             else:
                 qmax = -2.
-            self.q_table[self.encode(state, action)] = (self.reward(state, action) + self.discount_factor*qmax )
+            self.q_table[q_hash] = (self.reward(state, action) + self.discount_factor*qmax )
         elif self.environment.is_deadlock(next_state):
-            self.q_table[self.encode(state, action)] = self.reward(state, action)
+            self.q_table[q_hash] = self.reward(state, action)
         else:
-            self.q_table[self.encode(state, action)] = self.reward(state, action)
+            self.q_table[q_hash] = self.reward(state, action)
 
 
     def learn(self, state):
@@ -310,7 +312,7 @@ class BoxAgent(Agent):
             
             next_state = self.next_state(state, possible_action)
 
-            self.episode_print(f"{self.environment.direction_to_str(possible_action[1])}={self.q_table[self.encode(state, possible_action)]:.4f}, reward={self.reward(state, possible_action)}, goal={self.environment.is_goal_state(next_state)}, box_count={self.environment.count_boxes_scored(next_state)}")
+            #self.episode_print(f"{self.environment.direction_to_str(possible_action[1])}={self.q_table[self.encode(state, possible_action)]:.4f}, reward={self.reward(state, possible_action)}, goal={self.environment.is_goal_state(next_state)}, box_count={self.environment.count_boxes_scored(next_state)}")
 
             if chosen_action is None:
                 chosen_action = possible_action
@@ -339,6 +341,7 @@ class BoxAgent(Agent):
             box, action = box_action
             next_player_location = box - action
 
+
             path = self.find_path(state, next_player_location)
 
             if path:
@@ -353,16 +356,18 @@ class BoxAgent(Agent):
 
     def episode(self, draw=False, evaluate=False, max_iterations=8000):
         box_action_sequence = []
-        action_seqeuence = []
+        action_sequence = []
         self.q_sequence = []
         self.num_episodes += 1
         self.num_iterations = 0 
         self.boxes_scored = 0
 
-        if self.num_episodes == 1:
-            self.start_time = process_time()
+        # if self.num_episodes == 1:
+        #     self.start_time = process_time()
 
-        self.environment.reset()
+        iteration_times = []
+
+        #self.environment.reset()
         state = copy.deepcopy(self.environment.state)
         self.draw = draw
 
@@ -373,15 +378,9 @@ class BoxAgent(Agent):
         self.episode_print()
 
         previous = deque(maxlen=4)
-        def count(previous, current_hash):
-            count = 0
-            for item in previous:
-                if item == current_hash:
-                    count += 1
-            return count
 
         while not self.environment.is_goal_state(state) and not self.environment.is_deadlock(state) and self.num_iterations < max_iterations:
-
+            start_time = process_time()
 
             if not evaluate:
                 box_action = self.learn(state)
@@ -393,7 +392,7 @@ class BoxAgent(Agent):
             box, action = box_action  
 
             current_hash = self.encode(state, box_action)  
-            if count(previous, current_hash) >= 2:
+            if previous.count(current_hash) >= 2:
                 break
             else:
                 previous.append(current_hash)        
@@ -401,14 +400,19 @@ class BoxAgent(Agent):
             next_player_location = box - action
 
             path = self.find_path(state, next_player_location)
-
+            assert path != None
             if path:
-                for path_action in path:
-                    state = self.environment.next_state(state, path_action)
+                for path_action in path: ##should I optimize?
+                    #state = self.environment.next_state(state, path_action)
                     action_sequence.append(path_action)
 
+            #
+            action_sequence.append(action)
+            state.map[tuple(state.player)] = State.EMPTY
+            state.map[tuple(next_player_location)] = State.PLAYER
+            state.player = next_player_location
+
             state = self.environment.next_state(state, action)
-            action.sequence.append(action)
 
             num_boxes_scored = self.environment.count_boxes_scored(state)
             if self.boxes_scored < num_boxes_scored:
@@ -425,12 +429,14 @@ class BoxAgent(Agent):
                 self.environment.draw(state)
 
             box_action_sequence.append(box_action)
+
+            iteration_times.append(process_time() - start_time)
             self.num_iterations += 1
 
         goal_flag = self.environment.is_goal_state(state)
 
         if not evaluate and self.environment.count_boxes_scored(state) > 0:
-            self.replay(action_sequence)
+            self.replay(box_action_sequence)
         if self.num_iterations%self.print_threshold != 0:
             self.episode_print(f"goal={goal_flag}")
 
@@ -445,12 +451,10 @@ class BoxAgent(Agent):
             if goal_flag:
                 self.standard_print(f"iterations  :{self.num_iterations}")
             self.standard_print(f"greedy rate :{self.get_greedy_rate():.4f}")
-            self.standard_print(f"time taken  :{process_time()-self.start_time}")
+            nptimes = np.array(iteration_times)
+            self.standard_print(f"time per iteration:{nptimes.mean():.6f}+{np.std(nptimes):.6f}")
+            #self.standard_print(f"time taken  :{process_time()-self.start_time}")
             self.standard_print("-"*20)
-
-            if qmean > 500:
-                self.draw = True
-                self.replay(box_action_sequence,    update = False)
 
         self.draw = False
 

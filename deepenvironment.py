@@ -135,21 +135,17 @@ class DeepEnvironment(Environment):
                     #print("case 2")
                     if next_neighbor in previous:
                         #depndency cycle!
-                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
                     if self.is_frozen(state, np.array(next_neighbor), previous):
-                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
                 elif state[1, neighbor[0], neighbor[1]] == 1 and state[2, next_neighbor[0], next_neighbor[1]] == 1:
                     #print("case 3")
 
                     if neighbor in previous:
                         #dependency cycle!
-                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
 
                     if self.is_frozen(state, np.array(neighbor), previous):
-                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
                 elif state[1, neighbor[0], neighbor[1]] == 1 and state[1, next_neighbor[0], next_neighbor[1]] == 1:
                     # print("case 4")
@@ -166,12 +162,53 @@ class DeepEnvironment(Environment):
 
 
                     if frozen_neighbor and frozen_next_neighbor:
-                        self.deadlock_table[self.state_hash][location.tobytes()] = True
                         return True
 
         previous.remove(tuple(location))
         self.deadlock_table[self.state_hash][location.tobytes()] = False
 
+        return False
+
+    def is_dead_diagonal(self, state, location):
+
+        directions = Environment.DIRECTIONS
+
+        #neighbors = self.get_neighbors(location)
+        #0 top right
+        #1 bottom right
+        #2 bottom left
+        #3 top left
+        diagonals = [location + directions[i] + directions[(i+1)%len(directions)] for i in range(len(directions))]
+        for i in range(len(diagonals)):
+            diagonal_neighbor = diagonals[i]
+            diagonal_next_neighbor = diagonals[(i+1)%4]
+            orientation = directions[(i+1)%len(directions)]
+            across = 2*orientation + location
+            center = location + orientation
+
+            if self.is_valid(across) and ((self.state[1, center[0], center[1]] == 0).all() or (self.state[2, center[0], center[1]] == 0).all()):
+                if ((self.state[1, diagonal_neighbor[0], diagonal_neighbor[1]] == 1).all() or (self.state[2, diagonal_neighbor[0], diagonal_neighbor[1]] == 1).all())\
+                and ((self.state[1, diagonal_next_neighbor[0], diagonal_next_neighbor[1]] == 1).all() or (self.state[2, diagonal_next_neighbor[0], diagonal_next_neighbor[1]] == 1).all())\
+                and ((self.state[1, across[0], across[1]] == 1).all() or (self.state[2, across[0], across[1]] == 1).all())  : 
+                    possible_corner1 = location + directions[i]
+                    possible_corner2 = location + directions[(i+2)%len(directions)]
+
+                    opposite_corner1 = possible_corner2 + 2*orientation
+                    opposite_corner2 = possible_corner1 + 2*orientation
+
+                    corner1 = (((self.state[1, possible_corner1[0], possible_corner1[1]] == 1).all() or (self.state[2, possible_corner1[0], possible_corner1[1]] == 1).all())\
+                    and ((self.state[1, opposite_corner1[0], opposite_corner1[1]] == 1).all() or (self.state[2, opposite_corner1[0], opposite_corner1[1]] == 1).all()))
+                    corner2 = (((self.state[1, possible_corner2[0], possible_corner2[1]] == 1).all() or (self.state[2, possible_corner2[0], possible_corner2[1]] == 1).all())\
+                    and ((self.state[1, opposite_corner2[0], opposite_corner2[1]] == 1).all() or (self.state[2, opposite_corner2[0], opposite_corner2[1]] == 1).all()))
+                    if corner1 or corner2:
+                        #dead diagonal! hash all valid locations and update...
+                        surrounding = [diagonal_neighbor, diagonal_next_neighbor, across, possible_corner1, possible_corner2, opposite_corner1, opposite_corner2, location]
+
+                        for place in surrounding:
+                            if state[1, place[0], place[1]] == 1:
+                                self.deadlock_table[self.state_hash][place.tobytes()] = True
+                        return True
+        #print(f"return false for {location}")
         return False
 
 
@@ -193,8 +230,13 @@ class DeepEnvironment(Environment):
                 if state[1, i, j] == 1:
                     if box.tobytes() in self.deadlock_table[self.state_hash] and self.deadlock_table[self.state_hash][box.tobytes()]:
                         frozen_count += 1
-                    elif self.is_frozen(state, box, previous=set([])):
-                        frozen_count += 1
+                    else:
+                        if self.is_frozen(state, box, previous=set([])):
+                            self.deadlock_table[self.state_hash][box.tobytes()] = True
+                            frozen_count += 1
+                        elif self.is_dead_diagonal(state, box):
+                            frozen_count += 1
+
         if self.num_boxes - frozen_count < len(self.storage):
             return True
 

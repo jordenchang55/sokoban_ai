@@ -229,7 +229,6 @@ class DeepQAgent(Agent):
     def episode(self, draw = False, evaluate = False, max_iterations=5000):
         episode_start = time.process_time()
         self.num_episodes += 1
-        self.episode_print()
 
         state = np.copy(self.environment.state)
         self.training_times.append([])
@@ -240,6 +239,9 @@ class DeepQAgent(Agent):
  
         self.running_loss = 0
         self.times_trained = 0
+
+        self.episode_print()
+
 
         if draw:
             self.environment.draw(state)
@@ -271,15 +273,14 @@ class DeepQAgent(Agent):
             for k in range(1, 4):
                 rotate.append(np.rot90(rotate[0], k, (1, 2)))
             targets = [self.target(state, action) for action in self.actions]
-            self.replay_buffer.add((rotate[0], targets.copy()))
+            self.replay_buffer.add((rotate[0], targets))
             targets.append(targets.pop(0))
-            self.replay_buffer.add((rotate[1], targets.copy()))
+            self.replay_buffer.add((rotate[1], np.roll(targets, -1)))
             targets.append(targets.pop(0))
 
-            self.replay_buffer.add((rotate[2], targets.copy()))
+            self.replay_buffer.add((rotate[2], np.roll(targets, -2)))
             targets.append(targets.pop(0))
-            self.replay_buffer.add((rotate[3], targets.copy())) ##all symmetries
-
+            self.replay_buffer.add((rotate[3], np.roll(targets, -3))) ##all symmetries
 
 
 
@@ -297,8 +298,8 @@ class DeepQAgent(Agent):
 
             self.num_iterations += 1
             
-        if self.num_iterations%self.print_threshold != 0:
-            self.episode_print()
+        # if self.num_iterations%self.print_threshold != 0:
+        #     self.episode_print()
         goal_flag = self.environment.is_goal_state(state)
 
         if evaluate:
@@ -315,11 +316,11 @@ class DeepQAgent(Agent):
         if self.times_trained != 0:
             self.losses.append(self.running_loss/self.times_trained)
             self.episode_print(f"loss:{self.running_loss/self.times_trained:.3f}")
-
+            
 
         self.episode_times.append((self.num_iterations, time.process_time() - episode_start))
 
-        return goal_flag, self.num_iterations
+        return goal_flag, self.num_iterations, self.action_sequence
 
     def save_sequence(self, filename):
         with open(filename, 'w') as f:

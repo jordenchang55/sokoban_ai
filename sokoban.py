@@ -92,9 +92,15 @@ def train_all():
 
     epochs = 0
     max_epochs = 5000
+
     while epochs < max_epochs:
         file = random.choice(file_list) 
         walls, boxes, storage, player, xlim, ylim =  load(file)
+
+        while max_epochs < 5 and (xlim >= 9 or ylim >= 9):
+            file = random.choice(file_list) 
+            walls, boxes, storage, player, xlim, ylim =  load(file)
+
         if args.verbose:
             print(f"epoch {epochs}:{file} of size {xlim}, {ylim}.")
         environment = DeepEnvironment(walls = walls, boxes = boxes, storage = storage, player = player, xlim = xlim, ylim = ylim)
@@ -130,7 +136,7 @@ def train_all():
         for loss in agent.losses:
             writer.writerow(loss)
 
-
+    
 
 
 def train():
@@ -141,6 +147,7 @@ def train():
         raise Exception("Expected agent and filepath input.")
     if args.all:
         train_all()
+        return None
 
 
     # import matplotlib.patches as patches 
@@ -154,6 +161,7 @@ def train():
 
     walls, boxes, storage, player, xlim, ylim = load(args.command[2])    
 
+    print(f"{args.command[2]}:({xlim},{ylim}) with {len(boxes)} boxes")
     if args.command[1] == "deep":
         from deepqagent import DeepQAgent
         from deepenvironment import DeepEnvironment 
@@ -199,14 +207,14 @@ def train():
         # if num_episodes % 500 == 0 and num_episodes > 0: 
         #   iterative_threshold = iterative_threshold*2
 
-        goal, iterations = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
+        goal, iterations, _ = agent.episode(draw = args.draw, evaluate=False, max_iterations=max_iterations)
 
         if args.command[1] == "box":
-            if agent.num_episodes > 0 and agent.num_episodes % 500 == 0:
-                goal_evaluated, iterations = agent.episode(draw = args.verbose, evaluate=True, max_iterations=200)
+            if agent.num_episodes > 0 and agent.num_episodes % 100 == 0:
+                goal_evaluated, iterations, _ = agent.episode(draw = args.verbose, evaluate=True, max_iterations=200)
         elif args.command[1] == "deep":
             if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
-                goal_evaluated, iterations = agent.episode(draw = args.draw, evaluate=True, max_iterations=200)
+                goal_evaluated, iterations, _ = agent.episode(draw = args.draw, evaluate=True, max_iterations=200)
         if goal_evaluated:
             break
         #num_episodes += 1
@@ -218,7 +226,7 @@ def train():
             agent.save("sokoban_state.pth")
 
 
-    goal, iterations = agent.episode(draw = True, evaluate=True, max_iterations = 200)
+    goal, iterations, actions = agent.episode(draw = True, evaluate=True, max_iterations = 200)
 
     print("-"*30)
     print("Simulation ended.")
