@@ -98,8 +98,9 @@ def train_all():
         raise NotImplementedError
     from deepenvironment import DeepEnvironment
 
+    print(args.command[3])
     environment, agent = create_env_agent(args.command[1], file_list[0])
-    if len(args.command) == 2:
+    if len(args.command) >= 4:
         pretrain_path = Path("sokoban_state.pth")
         if pretrain_path.exists() and pretrain_path.is_file():
             agent.load("sokoban_state.pth")
@@ -139,7 +140,7 @@ def train_all():
                 if goal:
                     break
 
-        if len(args.command) == 3:
+        if len(args.command) >= 4:
             agent.save(args.command[3])
         else:
             agent.save("sokoban_state.pth")
