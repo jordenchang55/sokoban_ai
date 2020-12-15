@@ -13,7 +13,7 @@ class State:
     BOX = 2
     WALL = 3
 
-    def __init__(self, filename, walls, boxes, player, storage, xlim, ylim):
+    def __init__(self, walls, boxes, player, storage, xlim, ylim):
         self.map = np.zeros((xlim + 1, ylim + 1))
 
         for wall in walls:
@@ -197,8 +197,7 @@ class StateEnvironment(Environment):
                 continue
 
             if self.is_valid(across) and state_map[tuple(center)] == State.EMPTY:
-                if state_map[diagonal_neighbor] > State.PLAYER and state_map[diagonal_next_neighbor] > State.PLAYER and \
-                        state_map[across] > State.PLAYER:  # hack for checking if its box or wall
+                if state_map[diagonal_neighbor] > State.PLAYER and state_map[diagonal_next_neighbor] > State.PLAYER and state_map[across] > State.PLAYER:  # hack for checking if its box or wall
                     possible_corner1 = location + directions[i]
                     possible_corner2 = location + directions[(i + 2) % len(directions)]
 
@@ -214,8 +213,9 @@ class StateEnvironment(Environment):
                                        possible_corner2, opposite_corner1, opposite_corner2, location]
 
                         for place in np.array(surrounding):
-                            if state_map[tuple(place)] == State.BOX:
+                            if state_map[tuple(place)] == State.BOX and tuple(place) not in state.storage:
                                 self.deadlock_table[self.state_hash][place.tobytes()] = True
+
                         return True
         # print(f"return false for {location}")
         return False
@@ -228,7 +228,7 @@ class StateEnvironment(Environment):
         # if not self.frozen_nodes:
         #   self.frozen_nodes = set([])
 
-        self.state_hash = state.boxes.tobytes()
+        self.state_hash = state.map.tobytes()
 
         if self.state_hash not in self.deadlock_table:
             self.cache_miss += 1
@@ -238,6 +238,7 @@ class StateEnvironment(Environment):
 
         frozen_count = 0
         for box in state.boxes:
+            #print(box)
             box_hash = box.tobytes()
             if tuple(box) not in state.storage:
                 if box_hash in self.deadlock_table[self.state_hash]:

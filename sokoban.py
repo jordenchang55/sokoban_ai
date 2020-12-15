@@ -370,7 +370,7 @@ if __name__ == '__main__':
     parser.add_argument('--episodes', action='store', type=int, default=500)
     parser.add_argument('--iterations', action='store', type=int, default=3000)
     parser.add_argument('--learning_rate', action='store', type=float, default=1e-5)
-    parser.add_argument('--buffer_size', action='store', type=int, default=500000)
+    parser.add_argument('--buffer_size', action='store', type=int, default=5000000)
     parser.add_argument('--minibatch_size', action='store', type=int, default=128)
 
     parser.add_argument('--output', '-o', type=str)

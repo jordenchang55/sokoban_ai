@@ -186,7 +186,7 @@ class DeepEnvironment(Environment):
             across = 2*orientation + location
             center = location + orientation
 
-            if tuple(center) in self.storage:
+            if tuple(center) in self.storage or state[0, center[0], center[1]] == 1:
                 continue
             if self.is_valid(across) and ((self.state[1, center[0], center[1]] == 0).all() or (self.state[2, center[0], center[1]] == 0).all()):
                 if ((self.state[1, diagonal_neighbor[0], diagonal_neighbor[1]] == 1).all() or (self.state[2, diagonal_neighbor[0], diagonal_neighbor[1]] == 1).all())\
@@ -207,7 +207,7 @@ class DeepEnvironment(Environment):
                         surrounding = [diagonal_neighbor, diagonal_next_neighbor, across, possible_corner1, possible_corner2, opposite_corner1, opposite_corner2, location]
 
                         for place in surrounding:
-                            if state[1, place[0], place[1]] == 1:
+                            if state[1, place[0], place[1]] == 1 and tuple(place) not in self.storage:
                                 self.deadlock_table[self.state_hash][place.tobytes()] = True
                         return True
         #print(f"return false for {location}")
@@ -217,7 +217,7 @@ class DeepEnvironment(Environment):
     def is_deadlock(self, state):
         # if not self.frozen_nodes:
         #   self.frozen_nodes = set([])
-        self.state_hash = state[1,:,:].tobytes()
+        self.state_hash = state[:2,:,:].tobytes()
 
         if self.state_hash not in self.deadlock_table:
             self.cache_miss += 1

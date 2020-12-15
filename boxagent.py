@@ -187,7 +187,7 @@ class BoxAgent(Agent):
         # # print(f"possible:{len(possible_actions)}")
         if len(possible_actions) == 0:
             for box in state.boxes:
-                self.environment.deadlock_table[state.boxes.tobytes()][box.tobytes()] = True
+                self.environment.deadlock_table[state.map.tobytes()][box.tobytes()] = True
         # #     self.environment.pause = 10.
         # #     self.environment.draw(state)
         return possible_actions
@@ -230,7 +230,9 @@ class BoxAgent(Agent):
         #     print(next_position)
         #     plt.show(block=True)
         #     assert state.map[tuple(next_position)] <= State.PLAYER, "place should be empty"
-        next_state.map[tuple(box)] = State.EMPTY
+        next_state.map[tuple(next_state.player)] = State.EMPTY
+        next_state.player = box
+        next_state.map[tuple(box)] = State.PLAYER
         next_state.map[tuple(next_position)] = State.BOX
 
         for index in range(len(state.boxes)):

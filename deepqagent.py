@@ -302,12 +302,12 @@ class DeepQAgent(Agent):
         if evaluate:
             qvalues = np.array(self.q_sequence)
             qmean = qvalues.mean()
-            print("-" * 20)
-            print(f"evaluation :{goal_flag}")
-            print(f"mean q(s,a):{qmean:.3f}")
+            self.verbose_print("-" * 20)
+            self.verbose_print(f"evaluation :{goal_flag}")
+            self.verbose_print(f"mean q(s,a):{qmean:.3f}")
             if goal_flag:
-                print(f"iterations :{self.num_iterations}")
-            print("-" * 20)
+                self.verbose_print(f"iterations :{self.num_iterations}")
+            self.verbose_print("-" * 20)
 
         if self.times_trained != 0:
             self.losses.append(self.running_loss / self.times_trained)
