@@ -62,19 +62,19 @@ def create_env_agent(agent_name, filename):
     if agent_name == "deep":
         from deepqagent import DeepQAgent
         from deepenvironment import DeepEnvironment
-        environment = DeepEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim,
+        environment = DeepEnvironment(filename = filename, walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim,
                                       pause=args.pause)
         agent = DeepQAgent(environment=environment, discount_factor=0.95, verbose=args.verbose)
     elif agent_name == "box":
         from boxagent import BoxAgent
         from stateenvironment import StateEnvironment
-        environment = StateEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim,
+        environment = StateEnvironment(filename = filename,walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim,
                                        pause=args.pause)
         agent = BoxAgent(environment=environment, discount_factor=0.95, verbose=args.verbose)
     elif agent_name == "q":
         from agent import QAgent
         from stateenvironment import StateEnvironment
-        environment = StateEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim,
+        environment = StateEnvironment(filename = filename, walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim,
                                        pause=args.pause)
         agent = QAgent(environment=environment, discount_factor=0.95, verbose=args.verbose)
     else:
@@ -134,7 +134,6 @@ def train_all():
             goal, iterations, actions = agent.episode(draw=args.draw, evaluate=False, max_iterations=max_iterations)
 
             if agent.num_episodes % 100 == 0:
-                print(f"epoch {epochs}:{file} of size {xlim}, {ylim}.")
 
                 goal, iterations, actions = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
                 if goal:

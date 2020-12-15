@@ -159,10 +159,10 @@ class DeepQAgent(Agent):
         if self.environment.is_goal_state(next_state):
             return 1.  # 500.
         elif self.environment.count_boxes_scored(state) < self.environment.count_boxes_scored(next_state):
-            print("reward on goal")
+            #print("reward on goal")
             return 1.  # .
         elif self.environment.count_boxes_scored(state) > self.environment.count_boxes_scored(next_state):
-            print("reward off")
+            #print("reward off")
             return -1.
         elif self.environment.is_deadlock(state):
             return -1.

@@ -28,7 +28,7 @@ class Agent:
 
 	def episode_print(self, string=""):
 
-		self.verbose_print(f"{self.num_episodes:6d}.{self.num_iterations:5d}:{string}")
+		self.verbose_print(f"{self.environment.filename}:{self.num_episodes:6d}.{self.num_iterations:5d}:{string}")
 
 	def reward(self, state, action):
 		raise NotImplementedError

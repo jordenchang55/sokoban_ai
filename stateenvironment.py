@@ -13,7 +13,7 @@ class State:
     BOX = 2
     WALL = 3
 
-    def __init__(self, walls, boxes, player, storage, xlim, ylim):
+    def __init__(self, filename, walls, boxes, player, storage, xlim, ylim):
         self.map = np.zeros((xlim + 1, ylim + 1))
 
         for wall in walls:
@@ -47,8 +47,8 @@ class State:
 
 class StateEnvironment(Environment):
 
-    def __init__(self, walls, boxes, player, storage, xlim, ylim, pause=0.05):
-        super().__init__(xlim, ylim)
+    def __init__(self, filename, walls, boxes, player, storage, xlim, ylim, pause=0.05):
+        super().__init__(filename, xlim, ylim)
 
         self.state = State(walls, boxes, player, storage, xlim, ylim)
 

@@ -9,10 +9,11 @@ class Environment:
 	RIGHT = np.array([1, 0])
 	DIRECTIONS = [UP, RIGHT, DOWN, LEFT]
 
-	def __init__(self, xlim, ylim):
+	def __init__(self, filename, xlim, ylim):
 		self.fig = plt.figure()
 		self.xlim = xlim
 		self.ylim = ylim
+		self.filename = filename
 
 	def is_goal_state(self, state):
 		raise NotImplementedError

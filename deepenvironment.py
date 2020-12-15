@@ -7,8 +7,8 @@ from environment import Environment
 class DeepEnvironment(Environment):
 
 
-    def __init__(self, walls, boxes, player, storage, xlim, ylim, pause=0.05):
-        super().__init__(xlim, ylim)
+    def __init__(self, filename, walls, boxes, player, storage, xlim, ylim, pause=0.05):
+        super().__init__(filename, xlim, ylim)
         
 
         #0 player plane, 1 box plane, 2 wall plane, 3 storage plane
