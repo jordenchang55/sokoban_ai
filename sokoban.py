@@ -48,7 +48,7 @@ def load(filename):
 			elif index == 3:
 				storage = unpack(row)
 			elif index == 4:
-				player = np.array([int(row[0]), int(row[1])])
+				player = np.array([int(row[1]), int(row[0])])
 
 	return walls, boxes, storage, player, xlim, ylim
 
