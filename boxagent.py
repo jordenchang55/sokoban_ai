@@ -155,7 +155,8 @@ class BoxAgent(Agent):
             self.environment.draw(state)
 
 
-        #ax = plt.gca()
+        if self.draw:
+            ax = plt.gca()
         possible_actions = []
         for box in state.boxes:
             #print(box)
@@ -184,7 +185,9 @@ class BoxAgent(Agent):
             plt.show(block=False)
             plt.pause(0.5)
         # # print(f"possible:{len(possible_actions)}")
-        # # if len(possible_actions) == 0:
+        if len(possible_actions) == 0:
+            for box in state.boxes:
+                self.environment.deadlock_table[state.boxes.tobytes()][box.tobytes()] = True
         # #     self.environment.pause = 10.
         # #     self.environment.draw(state)
         return possible_actions
@@ -206,10 +209,10 @@ class BoxAgent(Agent):
         # else:
         #     return 0
 
-        if self.num_episodes > 50000:
+        if self.num_episodes > 20000:
             return 0.8
         else:
-            return 0.8*self.num_episodes/50000
+            return 0.8*self.num_episodes/20000
         #return 0.3
 
 
@@ -265,7 +268,10 @@ class BoxAgent(Agent):
                     self.q_table[item] = 1.
 
             if next_actions:
+                #print([self.q_table[item] for item in hashes])
                 qmax = np.amax(np.array([self.q_table[item] for item in hashes]))
+                #print(qmax)
+
             else:
                 qmax = -2.
             self.q_table[q_hash] = (self.reward(state, action) + self.discount_factor*qmax )
@@ -305,12 +311,12 @@ class BoxAgent(Agent):
                 self.q_table[self.encode(state, possible_action)] = 1. #represents an unseen state... not ideal while evaluating
 
 
-            if self.verbose and self.draw:
-                #print(possible_action)
-                next_state = self.next_state(state, possible_action)
-                #print(f"{possible_action[0]}, {self.environment.direction_to_str(possible_action[1])}:{self.q_table[self.encode(state, possible_action)]}:{self.environment.is_deadlock(next_state)}")
+            # if self.verbose and self.draw:
+            #     #print(possible_action)
+            #     next_state = self.next_state(state, possible_action)
+            #     #print(f"{possible_action[0]}, {self.environment.direction_to_str(possible_action[1])}:{self.q_table[self.encode(state, possible_action)]}:{self.environment.is_deadlock(next_state)}")
             
-            next_state = self.next_state(state, possible_action)
+            # next_state = self.next_state(state, possible_action)
 
             #self.episode_print(f"{self.environment.direction_to_str(possible_action[1])}={self.q_table[self.encode(state, possible_action)]:.4f}, reward={self.reward(state, possible_action)}, goal={self.environment.is_goal_state(next_state)}, box_count={self.environment.count_boxes_scored(next_state)}")
 
@@ -319,38 +325,28 @@ class BoxAgent(Agent):
                 chosen_value = self.q_table[self.encode(state, possible_action)]
             else:
                 potential_value = self.q_table[self.encode(state, possible_action)]
-                if chosen_value < potential_value:
+                if potential_value > chosen_value:
                     #keep this one
                     chosen_action = possible_action
                     chosen_value = potential_value
 
+        #if chosen_action is not None:
+        #    print(f"{chosen_value:.3f}:{self.environment.direction_to_str(chosen_action[1])}, reward:{self.reward(state, chosen_action):.3f}")
         self.q_sequence.append(chosen_value)
         return chosen_action
 
     def replay(self, action_sequence, update=True):
         self.environment.reset()
-        self.boxes_scored = 0
 
-        state = copy.deepcopy(self.environment.state)
-        for box_action in action_sequence:
-            if self.draw:
-                self.environment.draw(state)
-            if update:
-                self.update(state, box_action)
-            #print(f"q_table:{self.q_table[self.encode(state, box_action)]}")
+        for state_action in reversed(action_sequence):
+            
+
+            state, box_action = state_action
             box, action = box_action
             next_player_location = box - action
 
-
-            path = self.find_path(state, next_player_location)
-
-            if path:
-                for path_action in path:
-                    state = self.environment.next_state(state, path_action)
-            state = self.environment.next_state(state, action)
-
-        if self.draw:
-            self.environment.draw(state)
+            if update:
+                self.update(state, box_action)
 
 
 
@@ -362,12 +358,13 @@ class BoxAgent(Agent):
         self.num_iterations = 0 
         self.boxes_scored = 0
 
-        # if self.num_episodes == 1:
-        #     self.start_time = process_time()
+        if self.num_episodes == 1:
+            self.start = process_time()
 
         iteration_times = []
 
         #self.environment.reset()
+
         state = copy.deepcopy(self.environment.state)
         self.draw = draw
 
@@ -375,6 +372,8 @@ class BoxAgent(Agent):
 
         if draw:
             self.environment.draw(state)
+        if evaluate:
+            print('-'*20)
         self.episode_print()
 
         previous = deque(maxlen=4)
@@ -428,7 +427,7 @@ class BoxAgent(Agent):
             if draw:
                 self.environment.draw(state)
 
-            box_action_sequence.append(box_action)
+            box_action_sequence.append((copy.deepcopy(state), box_action))
 
             iteration_times.append(process_time() - start_time)
             self.num_iterations += 1
@@ -453,7 +452,7 @@ class BoxAgent(Agent):
             self.standard_print(f"greedy rate :{self.get_greedy_rate():.4f}")
             nptimes = np.array(iteration_times)
             self.standard_print(f"time per iteration:{nptimes.mean():.6f}+{np.std(nptimes):.6f}")
-            #self.standard_print(f"time taken  :{process_time()-self.start_time}")
+            self.standard_print(f"time taken  :{process_time()-self.start}")
             self.standard_print("-"*20)
 
         self.draw = False

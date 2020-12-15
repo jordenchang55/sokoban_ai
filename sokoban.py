@@ -134,6 +134,8 @@ def train_all():
 			goal, iterations, actions = agent.episode(draw=args.draw, evaluate=False, max_iterations=max_iterations)
 
 			if agent.num_episodes % 100 == 0:
+                print(f"epoch {epochs}:{file} of size {xlim}, {ylim}.")
+
 				goal, iterations, actions = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
 				if goal:
 					break

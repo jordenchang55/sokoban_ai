@@ -186,6 +186,8 @@ class DeepEnvironment(Environment):
             across = 2*orientation + location
             center = location + orientation
 
+            if tuple(center) in self.storage:
+                continue
             if self.is_valid(across) and ((self.state[1, center[0], center[1]] == 0).all() or (self.state[2, center[0], center[1]] == 0).all()):
                 if ((self.state[1, diagonal_neighbor[0], diagonal_neighbor[1]] == 1).all() or (self.state[2, diagonal_neighbor[0], diagonal_neighbor[1]] == 1).all())\
                 and ((self.state[1, diagonal_next_neighbor[0], diagonal_next_neighbor[1]] == 1).all() or (self.state[2, diagonal_next_neighbor[0], diagonal_next_neighbor[1]] == 1).all())\
