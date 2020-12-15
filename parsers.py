@@ -55,7 +55,7 @@ def save_map(maps, prefix, output):
 				'%d ' % len(m['walls']) + ' '.join(['%d %d' % t for t in m['walls']]) + '\n',
 				'%d ' % len(m['boxes']) + ' '.join(['%d %d' % t for t in m['boxes']]) + '\n',
 				'%d ' % len(m['goals']) + ' '.join(['%d %d' % t for t in m['goals']]) + '\n',
-				'%d %d' % (m['player'][1], m['player'][0]),
+				'%d %d' % tuple(m['player']),
 			])
 			i += 1
 
