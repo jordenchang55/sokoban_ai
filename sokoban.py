@@ -126,7 +126,7 @@ def train_all():
         if args.verbose:
             print(f"epoch {epochs}:{file} of size {xlim}, {ylim}.")
 
-        environment = DeepEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
+        environment = DeepEnvironment(filename=file, walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
         agent.load_environment(environment)
 
         while True:
