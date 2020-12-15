@@ -98,7 +98,7 @@ def train_all():
         raise NotImplementedError
     from deepenvironment import DeepEnvironment
 
-    environment, agent = create_env_agent(args[0], file_list[0])
+    environment, agent = create_env_agent(args.command[1], file_list[0])
     if len(args.command) == 2:
         pretrain_path = Path("sokoban_state.pth")
         if pretrain_path.exists() and pretrain_path.is_file():
