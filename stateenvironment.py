@@ -27,7 +27,7 @@ class State:
         self.storage = set(storage)
         self.boxes = np.array(boxes)
 
-        self.max_score = 0
+        # self.max_score = 0
 
     def __hash__(self):
         return self.map.tobytes()
@@ -41,7 +41,7 @@ class State:
         s.player = np.copy(self.player)
         s.boxes = np.copy(self.boxes)
         s.storage = self.storage.copy()
-        s.max_score = self.max_score
+        # s.max_score = self.max_score
         return s
 
 
@@ -75,11 +75,13 @@ class StateEnvironment(Environment):
         return (x >= 0 and x <= self.xlim and y >= 0 and y <= self.ylim)
 
     def count_boxes_scored(self, state):
-        count = 0
-        for place in state.storage:
-            if state.map[place] == State.BOX:
-                count += 1
-        return count
+
+        return sum([1 if state.map[place] == State.BOX else 0 for place in state.storage])
+        # count = 0
+        # for place in state.storage:
+        #     if state.map[place] == State.BOX:
+        #         count += 1
+        # return count
 
     def is_goal_state(self, state):
         for place in state.storage:
@@ -291,9 +293,9 @@ class StateEnvironment(Environment):
             next_state.player = next_position
         # return next_position
 
-        score_count = self.count_boxes_scored(next_state)
-        if next_state.max_score < score_count:
-            next_state.max_score = score_count
+        #score_count = self.count_boxes_scored(next_state)
+        # if next_state.max_score < score_count:
+        #     next_state.max_score = score_count
 
         return next_state
 

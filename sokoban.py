@@ -147,7 +147,7 @@ def train_all():
 
         epochs += 1
 
-    if len(args.command) == 3:
+    if len(args.command) >= 4:
         agent.save(args.command[3])
     else:
         agent.save("sokoban_state.pth")

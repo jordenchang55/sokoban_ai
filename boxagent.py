@@ -57,7 +57,7 @@ class BoxAgent(Agent):
 
 
     def encode(self, state, action):
-        return (state.boxes.tobytes(), state.max_score, action.tobytes())
+        return (state.boxes.tobytes(), action.tobytes())
 
     def reward(self, state, action):
         box, box_action = action
@@ -68,13 +68,17 @@ class BoxAgent(Agent):
     
 
         next_state = self.next_state(state, action)
-        # if push_on_goal:
-        #     print(next_state.max_score)
+        
+        this_score = self.environment.count_boxes_scored(state)
+        next_score = self.environment.count_boxes_scored(next_state)
+
         if self.environment.is_goal_state(next_state):
             return 500.
-        elif push_on_goal and state.max_score < next_state.max_score:
+        elif push_on_goal and this_score < next_score:
             #print("reward")
-            return 50
+            return 50.
+        elif this_score > next_score:
+            return -50.
         elif self.environment.is_deadlock(state):
             return -2.
         else:
@@ -240,10 +244,10 @@ class BoxAgent(Agent):
                 next_state.boxes[index] = next_position
                 break
 
-        if tuple(next_position) in next_state.storage:
-            score = self.environment.count_boxes_scored(next_state)
-            if next_state.max_score < score:
-                next_state.max_score = score
+        # if tuple(next_position) in next_state.storage:
+        #     score = self.environment.count_boxes_scored(next_state)
+        #     if next_state.max_score < score:
+        #         next_state.max_score = score
 
 
         # for box in next_state.boxes:
