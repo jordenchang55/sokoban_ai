@@ -378,8 +378,6 @@ class BoxAgent(Agent):
 
         if draw:
             self.environment.draw(state)
-        if evaluate:
-            print('-'*20)
         self.episode_print()
 
         previous = deque(maxlen=4)
