@@ -83,6 +83,46 @@ class ReplayBuffer:
         return [self.buffer[i] for i in index]
 
 
+class PrioritizedReplayBuffer:
+    def __init__(self, buffer_size):
+        self.buffer = deque(maxlen=buffer_size)
+        # tiny numbers prevent from divided by zero
+        self.priorities = np.ones(buffer_size) - 0.999999999
+
+    def __len__(self):
+        return len(self.buffer)
+
+    def add(self, exp):
+        self.buffer.append(exp)
+
+    def sample(self, sample_size, prioritize_scale=0.9):
+        """
+
+        :param sample_size:
+        :param prioritize_scale: Determine how much sampling depends on priority.
+        Value belongs to [0,1] where 0 is uniformly random sample and 1 is completely depending on priority.
+        """
+        indices = np.arange(len(self.buffer))
+        if sample_size > len(self.buffer):
+            return np.array(self.buffer), indices
+
+        # P(i) = p_i^scale / sum_k(p_k^scale)
+        scaled_priorities = np.power(self.priorities[0:len(self.buffer)], prioritize_scale)
+        prob = scaled_priorities / np.sum(scaled_priorities)
+        sampled_indices = np.random.choice(indices, sample_size, p=prob, replace=False)
+        return [self.buffer[i] for i in sampled_indices], sampled_indices
+
+    def update_priorities(self, errors, indices, offset=0.1):
+        """
+
+        :param errors: Error between prediction and target used to prioritising.
+        :param indices: Indicate which priority needs to be updated. This is based on what
+         samples are selected for training last time.
+        :param offset: Adding small offset prevents any experience from never being chosen.
+        """
+        self.priorities[indices] = np.abs(errors) + offset
+
+
 class DeepQAgent(Agent):
     INPUT_SIZE = 15
 
