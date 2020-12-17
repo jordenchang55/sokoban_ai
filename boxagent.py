@@ -31,7 +31,7 @@ class Node:
         return next(self.data)
 
 class BoxAgent(Agent):
-    def __init__(self, environment, discount_factor = 0.90, replay_rate = 0.2, quiet = False, verbose = False):
+    def __init__(self, environment, discount_factor = 0.90, greedy_rate = 0.8, quiet = False, verbose = False):
         #super()
         super().__init__(environment, quiet, verbose)
 
@@ -50,7 +50,7 @@ class BoxAgent(Agent):
         #internal reward metric
         self.boxes_scored = 0
 
-
+        self.greedy_rate = greedy_rate
         #self.environment.draw(self.environment.state)
         #self.greedy_hash = self.encode(self.environment.state, self.get_actions(self.environment.state)[0])
 
@@ -69,15 +69,15 @@ class BoxAgent(Agent):
 
         next_state = self.next_state(state, action)
         
-        this_score = self.environment.count_boxes_scored(state)
-        next_score = self.environment.count_boxes_scored(next_state)
+        current_score = self.environment.count_goals(state)
+        next_score = self.environment.count_goals(next_state)
 
         if self.environment.is_goal_state(next_state):
             return 500.
-        elif push_on_goal and this_score < next_score:
+        elif push_on_goal and current_score < next_score:
             #print("reward")
             return 50.
-        elif this_score > next_score:
+        elif current_score > next_score:
             return -50.
         elif self.environment.is_deadlock(state):
             return -2.
@@ -214,9 +214,9 @@ class BoxAgent(Agent):
         #     return 0
 
         if self.num_episodes > 20000:
-            return 0.8
+            return self.greedy_rate
         else:
-            return 0.8*self.num_episodes/20000
+            return self.greedy_rate*self.num_episodes/20000
         #return 0.3
 
 
@@ -245,7 +245,7 @@ class BoxAgent(Agent):
                 break
 
         # if tuple(next_position) in next_state.storage:
-        #     score = self.environment.count_boxes_scored(next_state)
+        #     score = self.environment.count_goals(next_state)
         #     if next_state.max_score < score:
         #         next_state.max_score = score
 
@@ -324,7 +324,7 @@ class BoxAgent(Agent):
             
             # next_state = self.next_state(state, possible_action)
 
-            #self.episode_print(f"{self.environment.direction_to_str(possible_action[1])}={self.q_table[self.encode(state, possible_action)]:.4f}, reward={self.reward(state, possible_action)}, goal={self.environment.is_goal_state(next_state)}, box_count={self.environment.count_boxes_scored(next_state)}")
+            #self.episode_print(f"{self.environment.direction_to_str(possible_action[1])}={self.q_table[self.encode(state, possible_action)]:.4f}, reward={self.reward(state, possible_action)}, goal={self.environment.is_goal_state(next_state)}, box_count={self.environment.count_goals(next_state)}")
 
             if chosen_action is None:
                 chosen_action = possible_action
@@ -380,7 +380,7 @@ class BoxAgent(Agent):
             self.environment.draw(state)
         self.episode_print()
 
-        previous = deque(maxlen=4)
+        previous = deque(maxlen=6)
 
         while not self.environment.is_goal_state(state) and not self.environment.is_deadlock(state) and self.num_iterations < max_iterations:
             start_time = process_time()
@@ -395,7 +395,7 @@ class BoxAgent(Agent):
             box, action = box_action  
 
             current_hash = self.encode(state, box_action)  
-            if previous.count(current_hash) >= 2:
+            if previous.count(current_hash) >= 3:
                 break
             else:
                 previous.append(current_hash)        
@@ -417,7 +417,7 @@ class BoxAgent(Agent):
 
             state = self.environment.next_state(state, action)
 
-            num_boxes_scored = self.environment.count_boxes_scored(state)
+            num_boxes_scored = self.environment.count_goals(state)
             if self.boxes_scored < num_boxes_scored:
                 self.boxes_scored = num_boxes_scored
                 if not self.environment.is_goal_state(state):
@@ -438,7 +438,7 @@ class BoxAgent(Agent):
 
         goal_flag = self.environment.is_goal_state(state)
 
-        if not evaluate and self.environment.count_boxes_scored(state) > 0:
+        if not evaluate and self.environment.count_goals(state) > 0:
             self.replay(box_action_sequence)
         if self.num_iterations%self.print_threshold != 0:
             self.episode_print(f"goal={goal_flag}")

@@ -74,7 +74,7 @@ class StateEnvironment(Environment):
 
         return (x >= 0 and x <= self.xlim and y >= 0 and y <= self.ylim)
 
-    def count_boxes_scored(self, state):
+    def count_goals(self, state):
 
         return sum([1 if state.map[place] == State.BOX else 0 for place in state.storage])
         # count = 0
@@ -293,7 +293,7 @@ class StateEnvironment(Environment):
             next_state.player = next_position
         # return next_position
 
-        #score_count = self.count_boxes_scored(next_state)
+        #score_count = self.count_goals(next_state)
         # if next_state.max_score < score_count:
         #     next_state.max_score = score_count
 

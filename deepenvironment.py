@@ -92,7 +92,7 @@ class DeepEnvironment(Environment):
 
         return (x >= 0 and x <= self.xlim and y >= 0 and y <= self.ylim)
 
-    def count_boxes_scored(self, state):
+    def count_goals(self, state):
         count = 0
         for place in self.storage:
             if state[1, place[0], place[1]] == 1:

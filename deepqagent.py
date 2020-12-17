@@ -158,10 +158,10 @@ class DeepQAgent(Agent):
         state_hash = state.tobytes()
         if self.environment.is_goal_state(next_state):
             return 1.  # 500.
-        elif self.environment.count_boxes_scored(state) < self.environment.count_boxes_scored(next_state):
+        elif self.environment.count_goals(state) < self.environment.count_goals(next_state):
             #print("reward on goal")
             return 1.  # .
-        elif self.environment.count_boxes_scored(state) > self.environment.count_boxes_scored(next_state):
+        elif self.environment.count_goals(state) > self.environment.count_goals(next_state):
             #print("reward off")
             return -1.
         elif self.environment.is_deadlock(state):
@@ -283,7 +283,7 @@ class DeepQAgent(Agent):
             targets.append(targets.pop(0))
             self.replay_buffer.add((rotate[3], targets))  ##all symmetries
 
-            num_boxes_scored = self.environment.count_boxes_scored(state)
+            num_boxes_scored = self.environment.count_goals(state)
             if self.boxes_scored < num_boxes_scored:
                 self.boxes_scored = num_boxes_scored
 

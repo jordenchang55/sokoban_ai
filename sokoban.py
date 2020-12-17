@@ -202,6 +202,9 @@ def train():
         if args.command[1] == "box":
             if agent.num_episodes > 0 and agent.num_episodes % 100 == 0:
                 goal_evaluated, iterations, _ = agent.episode(draw=args.verbose, evaluate=True, max_iterations=200)
+        elif args.command[1] == "q":
+            if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
+                goal_evaluated, iterations, _ = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
         elif args.command[1] == "deep":
             if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
                 goal_evaluated, iterations, _ = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
@@ -370,7 +373,7 @@ def plot():
 
     fig = figure()
     ax = axes()
-
+    fig.suptitle('Benchmarks times across 20 samples for box agent')
     for file, x, y, num_box, t in zip(parsed_files, xlims, ylims, boxes, times):
         if file not in timing_data:
             timing_data[file] = []
@@ -390,12 +393,15 @@ def plot():
     timemax = np.array(times).max()
     ax.set_xticklabels(keys)
     ax.set_xticks(np.arange(1, len(keys)+1, 1))
+
     xlim(0,len(keys)+1)
     ylim(1,timemax*1.1)
 
     
     #plt.scatter(parsed_files, times, s=6)
-    show()
+    #show()
+    filename = Path(args.command[1])
+    savefig(f"{filename.stem}.png")
     #print(data)
 
 
@@ -421,7 +427,7 @@ if __name__ == '__main__':
     parser.add_argument('--quiet', '-q', action='store_true')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--episodes', action='store', type=int, default=500)
-    parser.add_argument('--iterations', action='store', type=int, default=3000)
+    parser.add_argument('--iterations', action='store', type=int, default=5000)
     parser.add_argument('--learning_rate', action='store', type=float, default=1e-5)
     parser.add_argument('--buffer_size', action='store', type=int, default=5000000)
     parser.add_argument('--minibatch_size', action='store', type=int, default=128)
