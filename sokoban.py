@@ -147,7 +147,7 @@ def train_all():
 
         epochs += 1
 
-    if len(args.command) == 3:
+    if len(args.command) >= 4:
         agent.save(args.command[3])
     else:
         agent.save("sokoban_state.pth")
@@ -202,6 +202,9 @@ def train():
         if args.command[1] == "box":
             if agent.num_episodes > 0 and agent.num_episodes % 100 == 0:
                 goal_evaluated, iterations, _ = agent.episode(draw=args.verbose, evaluate=True, max_iterations=200)
+        elif args.command[1] == "q":
+            if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
+                goal_evaluated, iterations, _ = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
         elif args.command[1] == "deep":
             if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
                 goal_evaluated, iterations, _ = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
@@ -277,7 +280,7 @@ def draw():
 
     def draw_file(filename):
         walls, boxes, storage, player, xlim, ylim = load(filename)
-        environment = StateEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
+        environment = StateEnvironment(filename = filename, walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
 
         environment.draw(environment.state)
         # for action in [
@@ -308,26 +311,32 @@ def draw():
 
 
 def time():
-    from deepenvironment import DeepEnvironment
-    from deepqagent import DeepQAgent
 
-    max_episodes = abs(args.episodes)
+    number_of_runs = 20
 
-    if len(args.command) < 3:
-        raise Exception("Expected 'time <input file> <output file>' format.")
+    if len(args.command) < 4:
+        raise Exception("Expected 'sokoban.py time <agent> <input file> <output file>' format.")
 
-    walls, boxes, storage, player, xlim, ylim = load(args.command[1])
 
-    environment = DeepEnvironment(walls=walls, boxes=boxes, storage=storage, player=player, xlim=xlim, ylim=ylim)
-    agent = DeepQAgent(environment=environment, discount_factor=0.95, verbose=args.verbose)
+    times = []
+    for i in range(number_of_runs):
+        print(i)
+        converge_flag = False
 
-    for i in range(100):
-        print(f"{i:5d}.{0:7d}:")
-        agent.episode(draw=False, evaluate=False)
+        environment, agent = create_env_agent(agent_name = args.command[1], filename = args.command[2])
 
-    data = zip(range(100), agent.episode_times, agent.training_times)
 
-    with open(args.command[2], 'a') as file:
+        start_time = process_time()
+        while not converge_flag:
+            goal, iterations, action_sequence = agent.episode(draw = False, evaluate=False, max_iterations=args.iterations)
+
+            if agent.num_episodes % 20 == 0:
+                converge_flag, _, _ = agent.episode(draw = False, evaluate=True, max_iterations=200)
+
+        times.append(process_time()-start_time)
+    data = zip([args.command[2]]*number_of_runs, [environment.xlim]*number_of_runs, [environment.ylim]*number_of_runs, [len(environment.state.boxes)]*number_of_runs, times)
+
+    with open(args.command[3], 'a') as file:
         writer = csv.writer(file, delimiter=',')
         for datum in data:
             writer.writerow(datum)
@@ -339,14 +348,61 @@ def plot():
     if len(args.command) < 2:
         raise Exception("Expected 'plot <csv file>' format.")
 
-    with open(args.command[0], 'r') as file:
+    with open(args.command[1], 'r') as file:
         reader = csv.reader(file, delimiter=',')
         for row in reader:
-            data.append([int(row[0]), eval(row[1]), eval(row[2])])
+            data.append([str(row[0]), eval(row[1]), eval(row[2]), eval(row[3]), eval(row[4])])
 
-    data = zip(*data)
+    files, xlims, ylims, boxes, times = zip(*data)
 
-    print(data)
+    import re
+    from pylab import plot, show, savefig, xlim, figure, \
+                ylim, legend, boxplot, setp, axes
+
+
+    parsed_files = []
+    for file in files:
+        match = re.search('([A-Za-z_]+([0-9]+[a-z]*)\.txt)', file)
+        if match:
+            parsed_files.append(match.group(2))
+
+    timing_data = {}
+    features = {}
+    box_plots = []
+
+
+    fig = figure()
+    ax = axes()
+    fig.suptitle('Benchmarks times across 20 samples for box agent')
+    for file, x, y, num_box, t in zip(parsed_files, xlims, ylims, boxes, times):
+        if file not in timing_data:
+            timing_data[file] = []
+        if file not in features:
+            features[file] = (x, y, num_box)
+        timing_data[file].append(t)
+
+
+
+    ax.set_yscale('log')    
+    for index, key in enumerate(timing_data):
+        print(f"{key:4s}{features[key]}:{np.mean(timing_data[key]):.2f}+{np.std(timing_data[key]):.2f}")
+        box_plots.append(boxplot(timing_data[key], positions=[(index)+1], widths=0.6))
+        #setBoxColors(box_plots[-1])
+    keys = [key for key in timing_data]
+
+    timemax = np.array(times).max()
+    ax.set_xticklabels(keys)
+    ax.set_xticks(np.arange(1, len(keys)+1, 1))
+
+    xlim(0,len(keys)+1)
+    ylim(1,timemax*1.1)
+
+    
+    #plt.scatter(parsed_files, times, s=6)
+    #show()
+    filename = Path(args.command[1])
+    savefig(f"{filename.stem}.png")
+    #print(data)
 
 
 def main():
@@ -360,6 +416,8 @@ def main():
         evaluate()
     elif args.command[0] == "time":
         time()
+    elif args.command[0] == "plot":
+        plot()
     else:
         print("Unrecognized command. Please use sokoban.py --help for help on usage.")
 
@@ -369,7 +427,7 @@ if __name__ == '__main__':
     parser.add_argument('--quiet', '-q', action='store_true')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--episodes', action='store', type=int, default=500)
-    parser.add_argument('--iterations', action='store', type=int, default=3000)
+    parser.add_argument('--iterations', action='store', type=int, default=5000)
     parser.add_argument('--learning_rate', action='store', type=float, default=1e-5)
     parser.add_argument('--buffer_size', action='store', type=int, default=5000000)
     parser.add_argument('--minibatch_size', action='store', type=int, default=128)

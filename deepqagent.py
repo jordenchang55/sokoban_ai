@@ -82,7 +82,6 @@ class ReplayBuffer:
         )
         return [self.buffer[i] for i in index]
 
-
 class PrioritizedReplayBuffer:
     def __init__(self, buffer_size):
         self.buffer = deque(maxlen=buffer_size)
@@ -121,8 +120,7 @@ class PrioritizedReplayBuffer:
         :param offset: Adding small offset prevents any experience from never being chosen.
         """
         self.priorities[indices] = np.abs(errors) + offset
-
-
+        
 class DeepQAgent(Agent):
     INPUT_SIZE = 15
 
@@ -153,7 +151,7 @@ class DeepQAgent(Agent):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
 
         # replay buffer. new per agent
-        self.replay_buffer = PrioritizedReplayBuffer(buffer_size=self.buffer_size)
+        self.replay_buffer = ReplayBuffer(buffer_size=self.buffer_size)
 
         self.action_sequence = None
 
@@ -198,11 +196,11 @@ class DeepQAgent(Agent):
         state_hash = state.tobytes()
         if self.environment.is_goal_state(next_state):
             return 1.  # 500.
-        elif self.environment.count_boxes_scored(state) < self.environment.count_boxes_scored(next_state):
-            # print("reward on goal")
+        elif self.environment.count_goals(state) < self.environment.count_goals(next_state):
+            #print("reward on goal")
             return 1.  # .
-        elif self.environment.count_boxes_scored(state) > self.environment.count_boxes_scored(next_state):
-            # print("reward off")
+        elif self.environment.count_goals(state) > self.environment.count_goals(next_state):
+            #print("reward off")
             return -1.
         elif self.environment.is_deadlock(state):
             return -1.
@@ -227,7 +225,7 @@ class DeepQAgent(Agent):
 
         self.model.train()
 
-        samples, indices = self.replay_buffer.sample(self.minibatch_size)
+        samples = self.replay_buffer.sample(self.minibatch_size)
 
         states, targets = zip(*samples)
         # print(len(states))
@@ -258,8 +256,6 @@ class DeepQAgent(Agent):
         self.times_trained += 1
 
         self.training_times[-1].append(time.process_time() - training_start)
-        errors = (y_pred - y).norm(dim=1).cpu().detach().numpy()
-        self.replay_buffer.update_priorities(errors, indices)
 
     def predict(self, state):
         pad_state = np.pad(state, [(0, 0), *self.pad_config])
@@ -312,11 +308,20 @@ class DeepQAgent(Agent):
             state = self.environment.next_state(state, chosen_action)
 
             # [UP RIGHT DOWN LEFT], [RIGHT DOWN LEFT UP], [DOWN, LEFT UP RIGHT] LEFT UP RIGHT DOWN]
-            pad_state = np.pad(state, [(0, 0), *self.pad_config])
+            rotate = [np.pad(state, [(0, 0), *self.pad_config])]
+            for k in range(1, 4):
+                rotate.append(np.rot90(rotate[0], k, (1, 2)))
             targets = [self.target(state, action) for action in self.actions]
-            self.replay_buffer.add((pad_state, targets))
+            self.replay_buffer.add((rotate[0], targets))
+            targets.append(targets.pop(0))
+            self.replay_buffer.add((rotate[1], targets))
+            targets.append(targets.pop(0))
 
-            num_boxes_scored = self.environment.count_boxes_scored(state)
+            self.replay_buffer.add((rotate[2], targets))
+            targets.append(targets.pop(0))
+            self.replay_buffer.add((rotate[3], targets))  ##all symmetries
+
+            num_boxes_scored = self.environment.count_goals(state)
             if self.boxes_scored < num_boxes_scored:
                 self.boxes_scored = num_boxes_scored
 
