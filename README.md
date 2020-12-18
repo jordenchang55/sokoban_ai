@@ -3,6 +3,17 @@ Sokoban is a puzzle game where a single player pushes boxes to different storage
 Each map contains a list of movable boxes, immovable walls, a list of storage locations, and the player’s initial starting position. Players cannot move into immobile objects suchas walls, but can push boxes given that the box has an empty location to be pushed to. To complete the game, the player must push a box onto each storage location marked on the map.  
 In this project, we try to build an AI agent which can solve Sokoban map.
 
+## Setup Environment
+This project is written in python3 and includes many dependencies which are listed in `requirements.txt`.
+Before running the program, you need to install them with the following commands.
+```bash
+# Create a virtual environment 
+virtualenv -p python3 venv
+source venv/bin/activate
+# Install packages
+pip install -r requirements.txt
+```
+
 ## Running the code
 We have implemented two algorithms.
 
@@ -10,8 +21,8 @@ For Q-Learning agent:
 `python3 sokoban.py train box <map_file>`
 
 For Deep Q-Learning agent:  
-`python3 sokoban.py train deep <map_file> --time 3600`  
-**Note:** deep Q-learning agent may not converge. 
+`python3 sokoban.py train deep <map_file>`  
+**Note:** This agent may not converge in time limit. 
 
 Runs with time limit:  
 `python3 sokoban.py train box <map_file> --time 3600`
