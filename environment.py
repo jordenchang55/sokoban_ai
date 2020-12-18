@@ -39,6 +39,16 @@ class Environment:
 			return "LEFT"
 		return "RIGHT"
 
+	def direction_to_letter(self, direction):
+
+		if all(direction == Environment.UP):
+			return "U"
+		elif all(direction == Environment.DOWN):
+			return "D"
+		elif all(direction == Environment.LEFT):
+			return "L"
+		return "R"
+
 	def rotate_direction_90(self, direction):
 		if all(direction == Environment.UP):
 			return Environment.RIGHT

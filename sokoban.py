@@ -192,25 +192,49 @@ def train():
             elif pretrain_path.exists() and not pretrain_path.is_file():
                 raise ValueError("Invalid file input.")
 
-    goal_evaluated = False
-    while agent.num_episodes < max_episodes:
-        # if num_episodes % 500 == 0 and num_episodes > 0:
-        #   iterative_threshold = iterative_threshold*2
+    goal = False
 
-        goal, iterations, _ = agent.episode(draw=args.draw, evaluate=False, max_iterations=max_iterations)
 
-        if args.command[1] == "box":
-            if agent.num_episodes > 0 and agent.num_episodes % 100 == 0:
-                goal_evaluated, iterations, _ = agent.episode(draw=args.verbose, evaluate=True, max_iterations=200)
-        elif args.command[1] == "q":
-            if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
-                goal_evaluated, iterations, _ = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
-        elif args.command[1] == "deep":
-            if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
-                goal_evaluated, iterations, _ = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
-        if goal_evaluated:
-            break
-    # num_episodes += 1
+    if args.time:
+        start_time = process_time()
+        runtime = process_time() - start_time
+        while args.time > runtime:
+            # if num_episodes % 500 == 0 and num_episodes > 0:
+            #   iterative_threshold = iterative_threshold*2
+
+            agent.episode(draw=args.draw, evaluate=False, max_iterations=max_iterations)
+
+            if args.command[1] == "box":
+                if agent.num_episodes > 0 and agent.num_episodes % 100 == 0:
+                    goal, iterations, action_sequence = agent.episode(draw=args.verbose, evaluate=True, max_iterations=200)
+            elif args.command[1] == "q":
+                if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
+                    goal, iterations, action_sequence = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
+            elif args.command[1] == "deep":
+                if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
+                    goal, iterations, action_sequence = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
+            if goal:
+                break
+            runtime = process_time() - start_time
+
+    else:
+        while agent.num_episodes < max_episodes:
+            # if num_episodes % 500 == 0 and num_episodes > 0:
+            #   iterative_threshold = iterative_threshold*2
+
+            agent.episode(draw=args.draw, evaluate=False, max_iterations=max_iterations)
+
+            if args.command[1] == "box":
+                if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
+                    goal, iterations, action_sequence = agent.episode(draw=args.verbose, evaluate=True, max_iterations=200)
+            elif args.command[1] == "q":
+                if agent.num_episodes > 0 and agent.num_episodes % 10 == 0:
+                    goal, iterations, action_sequence = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
+            elif args.command[1] == "deep":
+                if agent.num_episodes > 0 and agent.num_episodes % 50 == 0:
+                    goal, iterations, action_sequence = agent.episode(draw=args.draw, evaluate=True, max_iterations=200)
+            if goal:
+                break
 
     if args.command[1] == "deep":
         if len(args.command) == 3:
@@ -218,15 +242,17 @@ def train():
         else:
             agent.save("sokoban_state.pth")
 
-    goal, iterations, actions = agent.episode(draw=True, evaluate=True, max_iterations=200)
 
+    output = [str(len(action_sequence))] + [environment.direction_to_letter(action) for action in action_sequence]
+    print(' '.join(output))
     print("-" * 30)
     print("Simulation ended.")
-    print(f"episodes         :{agent.num_episodes}")
-    print(f"map solved       :{goal}")
-    print(f"iterations       :{iterations}")
-    print(f"deadlock hit rate:{environment.cache_hit / (environment.cache_miss + environment.cache_hit):.3f}")
     print(f"time taken       :{process_time() - start_time:.3f}")
+    print(f"solution length  :{len(action_sequence)}")
+    print(f"episodes         :{agent.num_episodes}")
+    #print(f"map solved       :{goal}")
+    #print(f"iterations       :{iterations}")
+    #print(f"deadlock hit rate:{environment.cache_hit / (environment.cache_miss + environment.cache_hit):.3f}")
     print("-" * 30)
     plt.show(block=True)
 
@@ -325,7 +351,6 @@ def time():
 
         environment, agent = create_env_agent(agent_name = args.command[1], filename = args.command[2])
 
-
         start_time = process_time()
         while not converge_flag:
             goal, iterations, action_sequence = agent.episode(draw = False, evaluate=False, max_iterations=args.iterations)
@@ -335,7 +360,7 @@ def time():
 
         times.append(process_time()-start_time)
     data = zip([args.command[2]]*number_of_runs, [environment.xlim]*number_of_runs, [environment.ylim]*number_of_runs, [len(environment.state.boxes)]*number_of_runs, times)
-
+    # data = zip([agent.greedy_rate]*number_of_runs, times)
     with open(args.command[3], 'a') as file:
         writer = csv.writer(file, delimiter=',')
         for datum in data:
@@ -343,6 +368,10 @@ def time():
 
 
 def plot():
+    import re
+    from pylab import plot, show, savefig, xlim, figure, \
+                ylim, legend, boxplot, setp, axes
+
     data = []
 
     if len(args.command) < 2:
@@ -351,13 +380,43 @@ def plot():
     with open(args.command[1], 'r') as file:
         reader = csv.reader(file, delimiter=',')
         for row in reader:
+            data.append([eval(row[0]), eval(row[1])])
+
+
+    # rates, times = zip(*data)
+    # fig = figure()
+    # ax = axes()
+    # fig.suptitle("Times across different greedy rates")
+
+    # rates_to_times = {}
+    # for item in data:
+    #     rate, time = item
+
+    #     if rate not in rates_to_times:
+    #         rates_to_times[rate] = []
+    #     rates_to_times[rate].append(time)
+
+    # box_plots = []
+    # for index, key in enumerate(rates_to_times):
+    #     box_plots.append(boxplot(rates_to_times[key], positions=[index+1], widths=0.8))
+
+    # keys = [key for key in rates_to_times]
+    # timemax = np.array(times).max()
+    # ax.set_xticklabels(keys)
+    # ax.set_xticks(np.arange(1, len(keys)+1, 1))
+
+    # xlim(0,len(keys)+1)
+    # ylim(1,timemax*1.1)
+    # show()
+
+    
+    
+    with open(args.command[1], 'r') as file:
+        reader = csv.reader(file, delimiter=',')
+        for row in reader:
             data.append([str(row[0]), eval(row[1]), eval(row[2]), eval(row[3]), eval(row[4])])
 
     files, xlims, ylims, boxes, times = zip(*data)
-
-    import re
-    from pylab import plot, show, savefig, xlim, figure, \
-                ylim, legend, boxplot, setp, axes
 
 
     parsed_files = []

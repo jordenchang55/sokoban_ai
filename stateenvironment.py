@@ -170,8 +170,10 @@ class StateEnvironment(Environment):
                 if frozen_neighbor and frozen_next_neighbor:
                     return True
 
-                previous.remove((location_tuple, neighbor))
-                previous.remove((location_tuple, next_neighbor))
+                if (location_tuple, neighbor) in previous:
+                    previous.remove((location_tuple, neighbor))
+                if (location_tuple, next_neighbor) in previous:
+                    previous.remove((location_tuple, next_neighbor))
 
         return False
 

@@ -447,17 +447,17 @@ class BoxAgent(Agent):
 
         if evaluate:
             qmean = np.array(self.q_sequence).mean()
-            self.standard_print("-"*20)
-            self.standard_print(f"goal reached:{goal_flag}")
+            self.verbose_print("-"*20)
+            self.verbose_print(f"goal reached:{goal_flag}")
             if self.q_sequence:
-                self.standard_print(f"mean q(s,a) :{qmean:.4f}")
+                self.verbose_print(f"mean q(s,a) :{qmean:.4f}")
             if goal_flag:
-                self.standard_print(f"iterations  :{self.num_iterations}")
-            self.standard_print(f"greedy rate :{self.get_greedy_rate():.4f}")
+                self.verbose_print(f"iterations  :{self.num_iterations}")
+            self.verbose_print(f"greedy rate :{self.get_greedy_rate():.4f}")
             nptimes = np.array(iteration_times)
-            self.standard_print(f"time per iteration:{nptimes.mean():.6f}+{np.std(nptimes):.6f}")
-            self.standard_print(f"time taken  :{process_time()-self.start}")
-            self.standard_print("-"*20)
+            self.verbose_print(f"time per iteration:{nptimes.mean():.6f}+{np.std(nptimes):.6f}")
+            self.verbose_print(f"time taken  :{process_time()-self.start}")
+            self.verbose_print("-"*20)
 
         self.draw = False
 
